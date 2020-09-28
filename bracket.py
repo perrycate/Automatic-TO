@@ -30,16 +30,18 @@ def create(api_token, name, tournament_type=DOUBLE_ELIM, is_unlisted=True):
 
     if 'tournament' not in resp:
         raise ValueError(
-            "Tournament creation unsuccesful. Challonge returned the following error(s): \n * "
+            "Bracket creation unsuccesful. Challonge returned the following error(s): \n * "
             + '\n * '.join(resp['errors']))
 
-    return Tournament(api_token, resp['tournament']['id'])
+    return Bracket(api_token, resp['tournament']['id'])
 
 
-class Tournament:
+# Represents a bracket in Challonge.
+class Bracket:
     def __init__(self, token, tourney_id):
         self._challonge_token = token
         self._tourney_id = tourney_id
+        self._players = self._fetch_players_by_id()
 
     def _fetch_players_by_id(self):
         raw = util.make_request(
@@ -47,11 +49,11 @@ class Tournament:
 
         # Raw format is a list of dicts, all with one property "participant".
         # Convert into dict of players by ID.
-        return {p["participant"]["id"]: p["participant"] for p in raw}
+        return {p["participant"]["id"]: p["participant"]["name"] for p in raw}
 
     @property
     def players(self):
-        self._players = self._fetch_players_by_id()
+        return self._players
 
     def add_players(self, names):
         payload = {
@@ -63,13 +65,15 @@ class Tournament:
             data=payload,
             raise_exception_on_http_error=True)
 
+        self._players = self._fetch_players_by_id()
+
 
 def _sanity_check():
     auth_token = sys.argv[1]
     tournament_id = sys.argv[2]
 
-    t = Tournament(auth_token, tournament_id)
-    t.add_players(['joe2', 'mamanew'])
+    b = Bracket(auth_token, tournament_id)
+    b.add_players(['alice', 'bob'])
 
 
 if __name__ == '__main__':
