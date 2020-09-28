@@ -11,10 +11,9 @@ DOUBLE_ELIM = 'double elimination'
 ROUND_ROBIN = 'round robin'
 SWISS = 'swiss'
 
+
 # Creates a new tournament in Challonge owned by the user with the given API key.
-# Returns a new Tournament object.
-
-
+# Returns a new Tournament object corresponding to the new tournament.
 def create(api_token, name, tournament_type=DOUBLE_ELIM, is_unlisted=True):
     payload = {
         'tournament': {
@@ -42,8 +41,6 @@ class Tournament:
         self._challonge_token = token
         self._tourney_id = tourney_id
 
-        self._players = self._fetch_players_by_id()
-
     def _fetch_players_by_id(self):
         raw = util.make_request(
             CHALLONGE_API, f'/tournaments/{self._tourney_id}/participants.json', {'api_key': self._challonge_token})
@@ -52,16 +49,27 @@ class Tournament:
         # Convert into dict of players by ID.
         return {p["participant"]["id"]: p["participant"] for p in raw}
 
-    @ property
+    @property
     def players(self):
-        return self._players
+        self._players = self._fetch_players_by_id()
+
+    def add_players(self, names):
+        payload = {
+            'participants': [{"name": n} for n in names],
+        }
+        util.make_request(
+            CHALLONGE_API, f'/tournaments/{self._tourney_id}/participants/bulk_add.json',
+            params={'api_key': self._challonge_token},
+            data=payload,
+            raise_exception_on_http_error=True)
 
 
 def _sanity_check():
     auth_token = sys.argv[1]
+    tournament_id = sys.argv[2]
 
-    t = create(auth_token, 'test')
-    print(t)
+    t = Tournament(auth_token, tournament_id)
+    t.add_players(['joe2', 'mamanew'])
 
 
 if __name__ == '__main__':
