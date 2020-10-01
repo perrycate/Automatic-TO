@@ -3,16 +3,45 @@ import discord
 import os
 import sys
 
+from tournament import Tournament
+
+from discord.ext import commands
+
+
 TOKEN_ENV_VAR = 'DISCORD_BOT_TOKEN'
 
 
 # Create bot instance.
-bot = discord.Client()
+bot = commands.Bot(command_prefix='!')
+tournaments_by_guild_id = {}
 
 
 @bot.event
 async def on_ready():
     print('sup')
+
+
+@bot.command()
+async def open(ctx, dest_channel, message="Registration is open! React to this message to register."):
+    guild = ctx.message.channel.guild
+
+    # To keep things simple, only allow one tournament per guild for now.
+    if guild.id in tournaments_by_guild_id:
+        # TODO give option of cancelling. Eventually allow many tournaments per 'cord.
+        await ctx.message.channel.send("Sorry, a tournament is already being run from this discord.")
+        return
+
+    dest = ctx.message.channel
+    for c in guild.channels:
+        if c.name == dest_channel and isinstance(c, discord.TextChannel):
+            dest = c
+            break
+
+    sent_msg = await dest.send(message)
+    tournaments_by_guild_id[guild.id] = Tournament(
+        guild.id, sent_msg.channel.id, sent_msg.id)
+
+    await ctx.send("Registration message posted!")
 
 
 @bot.event
