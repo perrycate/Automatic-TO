@@ -37,27 +37,31 @@ def create(api_token, name, tournament_type=DOUBLE_ELIM, is_unlisted=True):
             "Bracket creation unsuccesful. Challonge returned the following error(s): \n * "
             + '\n * '.join(resp['errors']))
 
-    return Bracket(api_token, resp['tournament']['id'])
+    return Bracket(api_token, resp['tournament']['id'], resp['tournament']['full_challonge_url'])
 
 
 # Represents a bracket in Challonge.
 class Bracket:
-    def __init__(self, token, tourney_id):
+    def __init__(self, token, tourney_id, link):
+        self.link = link
+
         self._challonge_token = token
         self._tourney_id = tourney_id
-        self._players = self._fetch_players_by_id()
+        self._player_ids_by_name = self._fetch_players_by_name()
 
-    def _fetch_players_by_id(self):
+    def _fetch_players_by_name(self):
         raw = util.make_request(
             CHALLONGE_API, f'/tournaments/{self._tourney_id}/participants.json', {'api_key': self._challonge_token})
 
         # Raw format is a list of dicts, all with one property "participant".
-        # Convert into dict of players by ID.
-        return {p["participant"]["id"]: p["participant"]["name"] for p in raw}
+        # Convert into dict of players by name.
+        return {p["participant"]["name"]: p["participant"]["id"] for p in raw}
 
     @property
     def players(self):
-        return self._players
+        # Only return the names.
+        # The caller needn't know that challonge IDs even exist.
+        return self._player_ids_by_name.keys()
 
     def add_players(self, names):
         payload = {
@@ -69,7 +73,7 @@ class Bracket:
             data=payload,
             raise_exception_on_http_error=True)
 
-        self._players = self._fetch_players_by_id()
+        self._player_ids_by_name = self._fetch_players_by_name()
 
 
 def _sanity_check():
