@@ -31,6 +31,8 @@ async def open(ctx, dest_channel, message="Registration is open! React to this m
         await ctx.message.channel.send("Sorry, a tournament is already being run from this discord.")
         return
 
+    # If the destination channel is invalid, just send the message to the
+    # channel the message was received from.
     dest = ctx.message.channel
     for c in guild.channels:
         if c.name == dest_channel and isinstance(c, discord.TextChannel):

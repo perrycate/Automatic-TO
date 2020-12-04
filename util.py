@@ -2,11 +2,14 @@ from urllib import request, parse, error
 import json
 
 
-# Makes a request to the given url (base+additional) and the given parameters.
-# If data is set, it should be a dictionary, which will be encoded as JSON.
-# This will make the request a POST request instead of GET
 def make_request(base_url, additional_url, params={}, data=None, raise_exception_on_http_error=False):
-    """Fetches resource at URL, converts JSON response to object."""
+    """
+    Fetches resource at URL, converts JSON response to object.
+
+    The URL is just base_url + additional_url.
+    If data is set, it should be a dictionary, which will be encoded as JSON.
+    This will make the request a POST request instead of GET.
+    """
 
     url = base_url + additional_url
     first_item = True

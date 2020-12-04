@@ -12,9 +12,13 @@ ROUND_ROBIN = 'round robin'
 SWISS = 'swiss'
 
 
-# Creates a new tournament in Challonge owned by the user with the given API key.
-# Returns a new Tournament object corresponding to the new tournament.
 def create(api_token, name, tournament_type=DOUBLE_ELIM, is_unlisted=True):
+    """
+    Creates a new tournament in Challonge owned by the user with the given API key.
+
+    name can only contain letters, numbers, and underscores.
+    Returns a new Tournament object corresponding to the created tournament.
+    """
     payload = {
         'tournament': {
             'name': f'{name}',
@@ -69,10 +73,10 @@ class Bracket:
 
 
 def _sanity_check():
+    # Create a new tournament, and add 2 dummy players to it.
     auth_token = sys.argv[1]
-    tournament_id = sys.argv[2]
 
-    b = Bracket(auth_token, tournament_id)
+    b = create(auth_token, "test_tourney_pls_ignore")
     b.add_players(['alice', 'bob'])
 
 

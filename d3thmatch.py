@@ -6,6 +6,25 @@ import time
 
 from datetime import datetime, timezone, timedelta
 
+"""
+Before the idea of a tournament bot even existed, I had the idea of a series of
+tools to make TOing large tournaments via challonge more bearable. This is the
+rough prototype I started before getting distracted with other things.
+
+The idea was to have something warn, and then auto-DQ people who didn't show up
+for their matches. This tool just checks for matches that haven't made progress
+in TIMEOUT_IN_MINS minutes, and prints them to the screen. I think. Idk, it's
+been a while.
+
+I copied this into the repo because at some point we may want to copypaste some
+of the late-checking logic into the tournament bot. If nothing else, this gives
+some crappy-but-functional (I think) sample code for interacting with the
+Challonge API. Enjoy(?)
+
+-Perry
+"""
+
+
 CHALLONGE_API = 'https://api.challonge.com/v1'
 KEY_ENV_VAR = 'API_KEY'
 TOURNEY_ENV_VAR = 'TOURNAMENT_ID'
@@ -21,24 +40,6 @@ class LateMatch:
         self.p1ID = p1ID
         self.p2ID = p2ID
         self.late_mins = late_by_mins
-
-
-def main():
-    key = os.environ[KEY_ENV_VAR]
-    tourney_id = os.environ[TOURNEY_ENV_VAR]
-
-    players = get_players_by_id(key, tourney_id)
-
-    while True:
-        late_players = find_late_matches(get_matches(key, tourney_id))
-
-        for m in late_players:
-            p1 = players[m.p1ID]
-            p2 = players[m.p2ID]
-            print(
-                f"Match between {p1['display_name']} and {p2['display_name']} is running {m.late_mins} minutes late.")
-
-        time.sleep(CHECK_INTERVAL_IN_SECS)
 
 
 def find_late_matches(matches):
@@ -108,6 +109,24 @@ def make_request(base_url, additional_url, params={}):
     # Convert raw response to usable JSON object
     response_as_string = response.read().decode('utf-8')
     return json.loads(response_as_string)
+
+
+def main():
+    key = os.environ[KEY_ENV_VAR]
+    tourney_id = os.environ[TOURNEY_ENV_VAR]
+
+    players = get_players_by_id(key, tourney_id)
+
+    while True:
+        late_players = find_late_matches(get_matches(key, tourney_id))
+
+        for m in late_players:
+            p1 = players[m.p1ID]
+            p2 = players[m.p2ID]
+            print(
+                f"Match between {p1['display_name']} and {p2['display_name']} is running {m.late_mins} minutes late.")
+
+        time.sleep(CHECK_INTERVAL_IN_SECS)
 
 
 if __name__ == '__main__':
