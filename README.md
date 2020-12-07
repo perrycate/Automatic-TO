@@ -4,7 +4,9 @@ Half-finished code for a bot to run tournaments entirely through discord.
 0. Make sure you have a recent-ish version of Python 3 installed, and pip/pipenv. If you're using windows, ~~install linux~~ make sure you have [WSL Installed](https://docs.microsoft.com/en-us/windows/wsl/install-win10) and are running the commands from inside it.
 1. From the directory the code is located in, install dependencies by running:
 
-    pipenv install
+```
+pipenv install
+```
 
 2. Get a copy of your Challonge API Key from [here](https://challonge.com/settings/developer).
 
@@ -12,7 +14,9 @@ Half-finished code for a bot to run tournaments entirely through discord.
 
 4. Start the bot with the following command:
 
-    DISCORD_BOT_TOKEN=\<your token here\> pipenv run ./main.py
+```
+DISCORD_BOT_TOKEN=<your token here> pipenv run ./main.py
+````
 
 ## Usage:
 TODO. Speaking of which...
