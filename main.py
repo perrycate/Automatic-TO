@@ -37,6 +37,14 @@ async def on_ready():
 
 @bot.command()
 async def open(ctx, dest_channel=None, message="Registration is open! React to this message to register."):
+    """
+    Posts a message that discord members can react to to be entered into a (thus far un-created) tournament.
+
+    Args:
+        dest_channel: The channel that the registration message should be posted to.
+            Defaults to whichever channel this command was run from.
+        message: The content of the registration message.
+    """
     guild = ctx.message.channel.guild
 
     # To keep things simple, only allow one tournament per guild for now.
@@ -62,6 +70,13 @@ async def open(ctx, dest_channel=None, message="Registration is open! React to t
 
 @bot.command()
 async def begin(ctx, tourney_name="Tournament"):
+    """
+    Creates a bracket containing every member that reacted to the previously-posted registration message.
+    Responds with a link to the new bracket.
+
+    Args:
+        tourney_name: The title of the tournament.
+    """
     guild = ctx.message.channel.guild
     tournament = tournaments_by_guild_id.get(guild.id)
     if tournament is None:
