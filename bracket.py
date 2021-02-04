@@ -75,14 +75,28 @@ class Bracket:
 
         self._player_ids_by_name = self._fetch_players_by_name()
 
+    def fetch_matches(self, mid=None):
+        if mid is None:
+            mid = self._tourney_id
+
+        matches = util.make_request(
+            CHALLONGE_API, f'/tournaments/{mid}/matches.json',
+            params={'api_key': self._challonge_token, 'state': "open"}
+        )
+
+        # Strip out the useless envelope-ish object
+        # (an abject with 1 property, "match", and that's it.)
+        return [m["match"] for m in matches]
+
 
 def _sanity_check():
     # Create a new tournament, and add 2 dummy players to it.
     auth_token = sys.argv[1]
 
     b = create(auth_token, "test_tourney_pls_ignore")
-    b.add_players(['alice', 'bob'])
+    b.add_players(["alice", "bob"])
 
+    print(b.fetch_matches(9338724))
 
 if __name__ == '__main__':
     _sanity_check()
