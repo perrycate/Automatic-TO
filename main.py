@@ -2,17 +2,19 @@
 import discord
 import os
 import sys
+import time
 
 from discord.ext import commands
 
 import bracket as challonge_bracket
 
-from tournament import Tournament
+from tournament import TourneyState
 
 
 DISCORD_TOKEN_VAR = 'DISCORD_BOT_TOKEN'
 CHALLONGE_TOKEN_VAR = 'CHALLONGE_TOKEN'
 PREFIX = '!'
+CHALLONGE_POLLING_INTERVAL_IN_SECS = 60
 
 # Check for auth token.
 if DISCORD_TOKEN_VAR not in os.environ:
@@ -27,9 +29,11 @@ challonge_auth = os.environ[CHALLONGE_TOKEN_VAR]
 # Create bot instance.
 bot = commands.Bot(command_prefix=PREFIX)
 
+
 @bot.event
 async def on_ready():
     print('sup')
+
 
 class WrappedMessage(discord.ext.commands.MessageConverter):
     """
@@ -41,6 +45,25 @@ class WrappedMessage(discord.ext.commands.MessageConverter):
             return await super().convert(ctx, argument)
         except discord.ext.commands.MessageNotFound:
             await ctx.send(f"Unable to find message {argument}. (Remember to hold shift when clicking 'Copy ID' to get the FULL ID. It should have a dash in the middle.)")
+
+
+async def ping_open_match(ctx, match, tourney_state, players_by_challonge_id):
+    # Don't call matches more than once.
+    mid = match['id']
+    if tourney_state.was_called(mid):
+        return
+
+    p1_id = match['player1_id']
+    p2_id = match['player2_id']
+
+    p1_discord_id = players_by_challonge_id[p1_id].discord_id
+    p2_discord_id = players_by_challonge_id[p2_id].discord_id
+
+    await ctx.send(
+        f"<@!{p1_discord_id}> <@!{p2_discord_id}> your match has been called!")
+
+    tourney_state.mark_called(mid)
+
 
 @bot.command()
 async def begin(ctx, reg_msg: WrappedMessage, tourney_name="Tournament"):
@@ -54,6 +77,7 @@ async def begin(ctx, reg_msg: WrappedMessage, tourney_name="Tournament"):
             it must be in the <channel ID>-<msg ID> format.
         tourney_name: The title of the tournament.
     """
+
     # Collect all the users who reacted to the registration message.
     names_by_discord_id = {}
     for r in reg_msg.reactions:
@@ -62,14 +86,23 @@ async def begin(ctx, reg_msg: WrappedMessage, tourney_name="Tournament"):
 
     # Create a challonge bracket, and match challonge IDs to discord IDs.
     bracket = challonge_bracket.create(challonge_auth, tourney_name)
-    bracket.add_players(names_by_discord_id.values())
+    bracket.create_players(names_by_discord_id)
 
     await ctx.send(f"Bracket has been created! View it here: {bracket.link}")
 
+    players_by_challonge_id = {
+        p.challonge_id: p for p in bracket.players}
 
-# Log in and begin reading and responding to messages.
-# Nothing else will run below this line.
-bot.run(discord_auth)
+    # Poll for match updates indefinitely.
+    # TODO tomorrow as it turns out infinite loops are not our friend.
+    s = TourneyState(bracket.tourney_id)
+    while True:
+        for match_info in bracket.fetch_open_matches():
+            await ping_open_match(ctx, match_info, s, players_by_challonge_id)
+        time.sleep(CHALLONGE_POLLING_INTERVAL_IN_SECS)
+
+if __name__ == '__main__':
+    bot.run(discord_auth)
 
 
 def _sanity_check():

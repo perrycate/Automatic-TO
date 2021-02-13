@@ -4,6 +4,8 @@ import sys
 import pprint
 import uuid
 
+from tournament import Player
+
 CHALLONGE_API = 'https://api.challonge.com/v1'
 
 SINGLE_ELIM = 'single elimination'
@@ -47,7 +49,17 @@ class Bracket:
 
         self._challonge_token = token
         self._tourney_id = tourney_id
-        self._player_ids_by_name = self._fetch_players_by_name()
+        self._players = []
+
+    @property
+    def tourney_id(self):
+        return self._tourney_id
+
+    @property
+    def players(self):
+        # Only return the names.
+        # The caller needn't know that challonge IDs even exist.
+        return self._players
 
     def _fetch_players_by_name(self):
         raw = util.make_request(
@@ -57,15 +69,12 @@ class Bracket:
         # Convert into dict of players by name.
         return {p["participant"]["name"]: p["participant"]["id"] for p in raw}
 
-    @property
-    def players(self):
-        # Only return the names.
-        # The caller needn't know that challonge IDs even exist.
-        return self._player_ids_by_name.keys()
-
-    def add_players(self, names):
+    # Adds the given players to the tournament bracket.
+    # Returns a list of Player objects.
+    # NOTE: discord names must be unique! (include the discriminator)
+    def create_players(self, names_by_discord_id):
         payload = {
-            'participants': [{"name": n} for n in names],
+            'participants': [{"name": n} for n in names_by_discord_id.values()],
         }
         util.make_request(
             CHALLONGE_API, f'/tournaments/{self._tourney_id}/participants/bulk_add.json',
@@ -73,9 +82,13 @@ class Bracket:
             data=payload,
             raise_exception_on_http_error=True)
 
-        self._player_ids_by_name = self._fetch_players_by_name()
+        challonge_ids_by_discord_name = self._fetch_players_by_name()
+        self._players = []
+        for discord_id, name in names_by_discord_id.items():
+            challonge_id = challonge_ids_by_discord_name[name]
+            self._players.append(Player(discord_id, challonge_id))
 
-    def fetch_matches(self, mid=None):
+    def fetch_open_matches(self, mid=None):
         if mid is None:
             mid = self._tourney_id
 
@@ -94,9 +107,10 @@ def _sanity_check():
     auth_token = sys.argv[1]
 
     b = create(auth_token, "test_tourney_pls_ignore")
-    b.add_players(["alice", "bob"])
+    b.create_players({53190: "Alice", 3519: "Bob"})
 
-    print(b.fetch_matches(9338724))
+    print(b.players)
+
 
 if __name__ == '__main__':
     _sanity_check()

@@ -1,11 +1,20 @@
 import pickle
 
 from os import path
-
+from uuid import UUID, uuid1
+from dataclasses import dataclass
 
 STATE_BACKUP_DIR = '/tmp/'
 
 
+@dataclass
+class Player:
+    discord_id: int
+    challonge_id: str
+    key_id: UUID = uuid1()
+
+
+# TODO rename to State
 class TourneyState:
     """
     Manages state of a tournament being run.
