@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import asyncio
 import discord
 import os
 import sys
@@ -14,7 +15,7 @@ from tournament import TourneyState
 DISCORD_TOKEN_VAR = 'DISCORD_BOT_TOKEN'
 CHALLONGE_TOKEN_VAR = 'CHALLONGE_TOKEN'
 PREFIX = '!'
-CHALLONGE_POLLING_INTERVAL_IN_SECS = 60
+CHALLONGE_POLLING_INTERVAL_IN_SECS = 10
 
 # Check for auth token.
 if DISCORD_TOKEN_VAR not in os.environ:
@@ -65,6 +66,22 @@ async def ping_open_match(ctx, match, tourney_state, players_by_challonge_id):
     tourney_state.mark_called(mid)
 
 
+async def monitor_matches(ctx, bracket):
+    """
+    Poll for match updates indefinitely.
+
+    If a match is "called" notify the players in discord.
+    """
+    players_by_challonge_id = {
+        p.challonge_id: p for p in bracket.players}
+
+    s = TourneyState(bracket.tourney_id)
+    while True:
+        for match_info in bracket.fetch_open_matches():
+            await ping_open_match(ctx, match_info, s, players_by_challonge_id)
+        await asyncio.sleep(CHALLONGE_POLLING_INTERVAL_IN_SECS)
+
+
 @bot.command()
 async def begin(ctx, reg_msg: WrappedMessage, tourney_name="Tournament"):
     """
@@ -90,16 +107,8 @@ async def begin(ctx, reg_msg: WrappedMessage, tourney_name="Tournament"):
 
     await ctx.send(f"Bracket has been created! View it here: {bracket.link}")
 
-    players_by_challonge_id = {
-        p.challonge_id: p for p in bracket.players}
+    asyncio.create_task(monitor_matches(ctx, bracket))
 
-    # Poll for match updates indefinitely.
-    # TODO tomorrow as it turns out infinite loops are not our friend.
-    s = TourneyState(bracket.tourney_id)
-    while True:
-        for match_info in bracket.fetch_open_matches():
-            await ping_open_match(ctx, match_info, s, players_by_challonge_id)
-        time.sleep(CHALLONGE_POLLING_INTERVAL_IN_SECS)
 
 if __name__ == '__main__':
     bot.run(discord_auth)
