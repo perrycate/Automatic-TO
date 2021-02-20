@@ -14,8 +14,7 @@ class Player:
     key_id: UUID = uuid1()
 
 
-# TODO rename to State
-class TourneyState:
+class State:
     """
     Manages state of a tournament being run.
     This class backs info up in a nonvolatile way.

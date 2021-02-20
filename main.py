@@ -9,7 +9,7 @@ from discord.ext import commands
 
 import bracket as challonge_bracket
 
-from tournament import TourneyState
+from tournament import State
 
 
 DISCORD_TOKEN_VAR = 'DISCORD_BOT_TOKEN'
@@ -75,7 +75,7 @@ async def monitor_matches(ctx, bracket):
     players_by_challonge_id = {
         p.challonge_id: p for p in bracket.players}
 
-    s = TourneyState(bracket.tourney_id)
+    s = State(bracket.tourney_id)
     while True:
         for match_info in bracket.fetch_open_matches():
             await ping_open_match(ctx, match_info, s, players_by_challonge_id)
