@@ -2,14 +2,13 @@
 import asyncio
 import discord
 import os
+import pickle
 import sys
 import time
 
 from discord.ext import commands
 
 import bracket as challonge_bracket
-
-from tournament import State
 
 
 DISCORD_TOKEN_VAR = 'DISCORD_BOT_TOKEN'
@@ -48,10 +47,10 @@ class WrappedMessage(discord.ext.commands.MessageConverter):
             await ctx.send(f"Unable to find message {argument}. (Remember to hold shift when clicking 'Copy ID' to get the FULL ID. It should have a dash in the middle.)")
 
 
-async def ping_open_match(ctx, match, tourney_state, players_by_challonge_id):
+async def ping_open_match(ctx, match, bracket, players_by_challonge_id):
     # Don't call matches more than once.
     mid = match['id']
-    if tourney_state.was_called(mid):
+    if bracket.was_called(mid):
         return
 
     p1_id = match['player1_id']
@@ -63,7 +62,7 @@ async def ping_open_match(ctx, match, tourney_state, players_by_challonge_id):
     await ctx.send(
         f"<@!{p1_discord_id}> <@!{p2_discord_id}> your match has been called!")
 
-    tourney_state.mark_called(mid)
+    bracket.mark_called(mid)
 
 
 async def monitor_matches(ctx, bracket):
@@ -75,10 +74,9 @@ async def monitor_matches(ctx, bracket):
     players_by_challonge_id = {
         p.challonge_id: p for p in bracket.players}
 
-    s = State(bracket.tourney_id)
     while True:
         for match_info in bracket.fetch_open_matches():
-            await ping_open_match(ctx, match_info, s, players_by_challonge_id)
+            await ping_open_match(ctx, match_info, bracket, players_by_challonge_id)
         await asyncio.sleep(CHALLONGE_POLLING_INTERVAL_IN_SECS)
 
 
