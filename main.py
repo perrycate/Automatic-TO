@@ -10,11 +10,14 @@ from discord.ext import commands
 
 import bracket as challonge_bracket
 
+from tournament import State
+
 
 DISCORD_TOKEN_VAR = 'DISCORD_BOT_TOKEN'
 CHALLONGE_TOKEN_VAR = 'CHALLONGE_TOKEN'
 PREFIX = '!'
 CHALLONGE_POLLING_INTERVAL_IN_SECS = 10
+BACKUP_FILE = 'in_progress_tournaments.txt'
 
 # Check for auth token.
 if DISCORD_TOKEN_VAR not in os.environ:
@@ -30,8 +33,27 @@ challonge_auth = os.environ[CHALLONGE_TOKEN_VAR]
 bot = commands.Bot(command_prefix=PREFIX)
 
 
+def save_state(tourney_id, channel_id):
+    with open(BACKUP_FILE, 'a') as ids:
+        ids.write(f'{tourney_id} {channel_id}\n')
+
+
+def reload_state():
+    """Reload any tournaments that were in progress."""
+    tournaments_and_channels = []
+    with open(BACKUP_FILE, 'r') as ids:
+        for line in ids.readlines():
+            tourney_id, announce_channel_id = line.split()
+            b = challonge_bracket.resume(challonge_auth, tourney_id)
+            tournaments_and_channels.append((b, int(announce_channel_id)))
+    return tournaments_and_channels
+
+
 @bot.event
 async def on_ready():
+    for bracket, announce_channel_id in reload_state():
+        announce_channel = await bot.fetch_channel(announce_channel_id)
+        asyncio.create_task(monitor_matches(announce_channel, bracket))
     print('sup')
 
 
@@ -47,7 +69,7 @@ class WrappedMessage(discord.ext.commands.MessageConverter):
             await ctx.send(f"Unable to find message {argument}. (Remember to hold shift when clicking 'Copy ID' to get the FULL ID. It should have a dash in the middle.)")
 
 
-async def ping_open_match(ctx, match, bracket, players_by_challonge_id):
+async def announce_match(channel: discord.abc.Messageable, match, bracket, players_by_challonge_id):
     # Don't call matches more than once.
     mid = match['id']
     if bracket.was_called(mid):
@@ -59,7 +81,7 @@ async def ping_open_match(ctx, match, bracket, players_by_challonge_id):
     p1_discord_id = players_by_challonge_id[p1_id].discord_id
     p2_discord_id = players_by_challonge_id[p2_id].discord_id
 
-    await ctx.send(
+    await channel.send(
         f"<@!{p1_discord_id}> <@!{p2_discord_id}> your match has been called!")
 
     bracket.mark_called(mid)
@@ -76,7 +98,7 @@ async def monitor_matches(ctx, bracket):
 
     while True:
         for match_info in bracket.fetch_open_matches():
-            await ping_open_match(ctx, match_info, bracket, players_by_challonge_id)
+            await announce_match(ctx, match_info, bracket, players_by_challonge_id)
         await asyncio.sleep(CHALLONGE_POLLING_INTERVAL_IN_SECS)
 
 
@@ -100,15 +122,24 @@ async def begin(ctx, reg_msg: WrappedMessage, tourney_name="Tournament"):
             names_by_discord_id[u.id] = f'{u.name}#{u.discriminator}'
 
     # Create a challonge bracket, and match challonge IDs to discord IDs.
-    bracket = challonge_bracket.create(challonge_auth, tourney_name)
+    bracket, link = challonge_bracket.create(challonge_auth, tourney_name)
     bracket.create_players(names_by_discord_id)
 
-    await ctx.send(f"Bracket has been created! View it here: {bracket.link}")
+    await ctx.send(f"Bracket has been created! View it here: {link}")
+
+    save_state(bracket.tourney_id, ctx.channel.id)
 
     asyncio.create_task(monitor_matches(ctx, bracket))
 
 
 if __name__ == '__main__':
+
+    # Make sure our backup file exists
+    if not os.path.exists(BACKUP_FILE):
+        print(
+            f"WARNING: tournament id backup file '{BACKUP_FILE}' does not exist. Creating.")
+        open(BACKUP_FILE, 'w').close()
+
     bot.run(discord_auth)
 
 
