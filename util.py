@@ -1,8 +1,12 @@
-from urllib import request, parse, error
 import json
+from urllib import error, parse, request
 
 
-def make_request(base_url, additional_url, params={}, data=None, raise_exception_on_http_error=False):
+def make_request(base_url,
+                 additional_url,
+                 params={},
+                 data=None,
+                 raise_exception_on_http_error=False):
     """
     Fetches resource at URL, converts JSON response to object.
 

@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-import urllib.request
 import json
 import os
 import time
-
-from datetime import datetime, timezone, timedelta
+import urllib.request
+from datetime import datetime, timedelta, timezone
 
 """
 Before the idea of a tournament bot even existed, I had the idea of a series of
@@ -23,7 +22,6 @@ Challonge API. Enjoy(?)
 
 -Perry
 """
-
 
 CHALLONGE_API = 'https://api.challonge.com/v1'
 KEY_ENV_VAR = 'API_KEY'
@@ -54,20 +52,22 @@ def find_late_matches(matches):
     # Find late players.
     late = []
     for m in open_matches:
-        last_updated = datetime.strptime(
-            m['updated_at'], CHALLONGE_DATE_FORMAT)
-        elapsed_mins = (datetime.now(PDT)-last_updated).seconds / 60
+        last_updated = datetime.strptime(m['updated_at'],
+                                         CHALLONGE_DATE_FORMAT)
+        elapsed_mins = (datetime.now(PDT) - last_updated).seconds / 60
 
         if elapsed_mins > TIMEOUT_IN_MINS:
             late.append(
-                LateMatch(m['player1_id'], m['player2_id'], round(elapsed_mins)))
+                LateMatch(m['player1_id'], m['player2_id'],
+                          round(elapsed_mins)))
 
     return late
 
 
 def get_players_by_id(key, tourney_id):
-    raw = make_request(
-        CHALLONGE_API, f'/tournaments/{tourney_id}/participants.json', {'api_key': key})
+    raw = make_request(CHALLONGE_API,
+                       f'/tournaments/{tourney_id}/participants.json',
+                       {'api_key': key})
 
     # Raw format is a list of dicts, all with one property "participant".
     # Convert into dict of players by ID.
@@ -80,8 +80,9 @@ def get_players_by_id(key, tourney_id):
 
 
 def get_matches(key, tourney_id):
-    raw = make_request(
-        CHALLONGE_API, f'/tournaments/{tourney_id}/matches.json', {'api_key': key})
+    raw = make_request(CHALLONGE_API,
+                       f'/tournaments/{tourney_id}/matches.json',
+                       {'api_key': key})
 
     # Raw format is a little weird - a list of dicts, where each dict has one property "match".
     # Convert into list of matches.
@@ -124,7 +125,8 @@ def main():
             p1 = players[m.p1ID]
             p2 = players[m.p2ID]
             print(
-                f"Match between {p1['display_name']} and {p2['display_name']} is running {m.late_mins} minutes late.")
+                f"Match between {p1['display_name']} and {p2['display_name']} is running {m.late_mins} minutes late."
+            )
 
         time.sleep(CHECK_INTERVAL_IN_SECS)
 

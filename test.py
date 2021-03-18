@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
-import unittest
-import unittest.mock
-import discord
 import asyncio
-import uuid
-import tournament
-import main
-import pathlib
-import shutil
 import os
 import os.path
+import pathlib
+import shutil
+import unittest
+import unittest.mock
+import uuid
 
+import discord
+
+import main
+import tournament
 from bracket import _Bracket
 
 TEST_RUN_ID = uuid.uuid1()
@@ -23,7 +24,6 @@ class MyTest(unittest.TestCase):
     Contains setup and teardown to ensure that backup files don't mix state
     between tests.
     """
-
     def setUp(self):
         super().setUp()
 
@@ -50,8 +50,10 @@ class TestAnnounceMatch(MyTest):
         state = tournament.State("arbitraryID12")
         bracket = _Bracket("arbitraryToken", state)
         players = {
-            p1_challonge_id: tournament.Player(p1_discord_id, p1_challonge_id, 1),
-            p2_challonge_id: tournament.Player(p2_discord_id, p2_challonge_id, 2),
+            p1_challonge_id: tournament.Player(p1_discord_id, p1_challonge_id,
+                                               1),
+            p2_challonge_id: tournament.Player(p2_discord_id, p2_challonge_id,
+                                               2),
         }
         match = {
             'id': state.tournament_id,
@@ -110,7 +112,6 @@ class TestReloadsState(MyTest):
 
         self.assertEqual(1, len(new_s.players))
         self.assertEqual(p, new_s.players[0])
-
 
 
 if __name__ == '__main__':

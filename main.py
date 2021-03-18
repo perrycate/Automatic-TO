@@ -1,17 +1,15 @@
 #!/usr/bin/env python3
 import asyncio
-import discord
 import os
 import pickle
 import sys
 import time
 
+import discord
 from discord.ext import commands
 
 import bracket as challonge_bracket
-
 from tournament import State
-
 
 DISCORD_TOKEN_VAR = 'DISCORD_BOT_TOKEN'
 CHALLONGE_TOKEN_VAR = 'CHALLONGE_TOKEN'
@@ -21,12 +19,14 @@ BACKUP_FILE = 'in_progress_tournaments.txt'
 
 # Check for auth token.
 if DISCORD_TOKEN_VAR not in os.environ:
-    sys.exit("{0} not found in system environment. Try running again with the prefix '{0}=<insert discord bot token here>'".format(
-        DISCORD_TOKEN_VAR))
+    sys.exit(
+        "{0} not found in system environment. Try running again with the prefix '{0}=<insert discord bot token here>'"
+        .format(DISCORD_TOKEN_VAR))
 discord_auth = os.environ[DISCORD_TOKEN_VAR]
 if CHALLONGE_TOKEN_VAR not in os.environ:
-    sys.exit("{0} not found in system environment. Try running again with the prefix '{0}=<insert discord bot token here>'".format(
-        CHALLONGE_TOKEN_VAR))
+    sys.exit(
+        "{0} not found in system environment. Try running again with the prefix '{0}=<insert discord bot token here>'"
+        .format(CHALLONGE_TOKEN_VAR))
 challonge_auth = os.environ[CHALLONGE_TOKEN_VAR]
 
 # Create bot instance.
@@ -66,10 +66,13 @@ class WrappedMessage(discord.ext.commands.MessageConverter):
         try:
             return await super().convert(ctx, argument)
         except discord.ext.commands.MessageNotFound:
-            await ctx.send(f"Unable to find message {argument}. (Remember to hold shift when clicking 'Copy ID' to get the FULL ID. It should have a dash in the middle.)")
+            await ctx.send(
+                f"Unable to find message {argument}. (Remember to hold shift when clicking 'Copy ID' to get the FULL ID. It should have a dash in the middle.)"
+            )
 
 
-async def announce_match(channel: discord.abc.Messageable, match, bracket, players_by_challonge_id):
+async def announce_match(channel: discord.abc.Messageable, match, bracket,
+                         players_by_challonge_id):
     # Don't call matches more than once.
     mid = match['id']
     if bracket.was_called(mid):
@@ -93,12 +96,12 @@ async def monitor_matches(ctx, bracket):
 
     If a match is "called" notify the players in discord.
     """
-    players_by_challonge_id = {
-        p.challonge_id: p for p in bracket.players}
+    players_by_challonge_id = {p.challonge_id: p for p in bracket.players}
 
     while True:
         for match_info in bracket.fetch_open_matches():
-            await announce_match(ctx, match_info, bracket, players_by_challonge_id)
+            await announce_match(ctx, match_info, bracket,
+                                 players_by_challonge_id)
         await asyncio.sleep(CHALLONGE_POLLING_INTERVAL_IN_SECS)
 
 
@@ -137,7 +140,8 @@ if __name__ == '__main__':
     # Make sure our backup file exists
     if not os.path.exists(BACKUP_FILE):
         print(
-            f"WARNING: tournament id backup file '{BACKUP_FILE}' does not exist. Creating.")
+            f"WARNING: tournament id backup file '{BACKUP_FILE}' does not exist. Creating."
+        )
         open(BACKUP_FILE, 'w').close()
 
     bot.run(discord_auth)

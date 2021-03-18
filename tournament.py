@@ -1,8 +1,7 @@
+import os
 import pathlib
 import pickle
-import os
 import uuid
-
 from dataclasses import dataclass
 
 STATE_BACKUP_DIR = 'tournament_backups/'
@@ -14,15 +13,16 @@ class Player:
     challonge_id: str
     key_id: uuid.UUID
 
+
 def new_player(discord_id: int, challonge_id: str) -> Player:
     return Player(discord_id, challonge_id, uuid.uuid4())
+
 
 class State:
     """
     Manages state of a tournament being run.
     This class backs info up in a nonvolatile way.
     """
-
     def __init__(self, tournament_id: str):
         self._tournament_id = tournament_id
         self._called_matches = set()
@@ -33,7 +33,8 @@ class State:
         # Make sure our backup folder exists.
         if not os.path.exists(STATE_BACKUP_DIR):
             print(
-                f"WARNING: backup directory '{STATE_BACKUP_DIR}' does not exist. Creating.")
+                f"WARNING: backup directory '{STATE_BACKUP_DIR}' does not exist. Creating."
+            )
             os.makedirs(STATE_BACKUP_DIR)
 
         # Will blow up if 2 bots are managing the same tournament.
@@ -56,10 +57,11 @@ class State:
         # for that happening now is that (only the open matches) might get
         # pinged twice. So...whatever.
         with open(self._save_file_name, 'wb') as save_file:
-            pickle.dump({
-                'called_match_ids': self._called_matches,
-                'players': self._players,
-            }, save_file)
+            pickle.dump(
+                {
+                    'called_match_ids': self._called_matches,
+                    'players': self._players,
+                }, save_file)
             save_file.flush()
 
     @property
