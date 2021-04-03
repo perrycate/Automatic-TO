@@ -9,6 +9,7 @@ import discord
 from discord.ext import commands
 
 import bracket as challonge_bracket
+import challonge
 from tournament import State
 
 DISCORD_TOKEN_VAR = 'DISCORD_BOT_TOKEN'
@@ -71,23 +72,20 @@ class WrappedMessage(discord.ext.commands.MessageConverter):
             )
 
 
-async def announce_match(channel: discord.abc.Messageable, match, bracket,
+async def announce_match(channel: discord.abc.Messageable, match: challonge.Match, bracket,
                          players_by_challonge_id):
+
     # Don't call matches more than once.
-    mid = match['id']
-    if bracket.was_called(mid):
+    if bracket.was_called(match.id):
         return
 
-    p1_id = match['player1_id']
-    p2_id = match['player2_id']
-
-    p1_discord_id = players_by_challonge_id[p1_id].discord_id
-    p2_discord_id = players_by_challonge_id[p2_id].discord_id
+    p1_discord_id = players_by_challonge_id[match.p1_id].discord_id
+    p2_discord_id = players_by_challonge_id[match.p2_id].discord_id
 
     await channel.send(
         f"<@!{p1_discord_id}> <@!{p2_discord_id}> your match has been called!")
 
-    bracket.mark_called(mid)
+    bracket.mark_called(match.id)
 
 
 async def monitor_matches(ctx, bracket):

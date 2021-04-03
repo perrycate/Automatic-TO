@@ -10,6 +10,7 @@ import uuid
 
 import discord
 
+import challonge
 import main
 import tournament
 from bracket import _Bracket
@@ -55,12 +56,7 @@ class TestAnnounceMatch(MyTest):
             p2_challonge_id: tournament.Player(p2_discord_id, p2_challonge_id,
                                                2),
         }
-        match = {
-            'id': state.tournament_id,
-            'player1_id': p1_challonge_id,
-            'player2_id': p2_challonge_id,
-            'state': "open",
-        }
+        match = challonge.Match(state.tournament_id, p1_challonge_id, p2_challonge_id)
         context = unittest.mock.MagicMock(spec=discord.ext.commands.Context)
 
         # Ping the open match.
