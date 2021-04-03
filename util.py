@@ -6,7 +6,8 @@ def make_request(base_url,
                  additional_url,
                  params={},
                  data=None,
-                 raise_exception_on_http_error=False):
+                 raise_exception_on_http_error=False,
+                 method=None):
     """
     Fetches resource at URL, converts JSON response to object.
 
@@ -30,7 +31,7 @@ def make_request(base_url,
         data = json.dumps(data).encode()
         headers['Content-Type'] = 'application/json'
     try:
-        r = request.Request(url, data, headers)
+        r = request.Request(url, data, headers, method=method)
         response = request.urlopen(r)
     except error.HTTPError as e:
         # Usually we want to return any data on an HTTP error,

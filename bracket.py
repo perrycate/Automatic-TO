@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-import pprint
 import sys
+from typing import List
 
 import tournament
 import challonge
-import util
 
 
 def create(api_token, name, tournament_type=challonge.TourneyType.DOUBLE_ELIM, is_unlisted=True):
@@ -37,8 +36,8 @@ class _Bracket:
         return self._local_state.tournament_id
 
     @property
-    def players(self):
-        # Note that we do not check challonge itself to see if any players have been
+    def players(self) -> List[tournament.Player]:
+        # Note that we do not contact challonge to see if any players have been
         # added or removed manually. This is ok because:
         # * If players were added, we have no idea how to relate it to their
         #       discord ids yet anyway.
@@ -58,6 +57,7 @@ class _Bracket:
             players.append(tournament.new_player(discord_id, challonge_id))
 
         self._local_state.add_players(players)
+        return self.players
 
     def fetch_open_matches(self):
         return self._challonge_client.list_matches(self.tourney_id)
@@ -73,13 +73,14 @@ def _sanity_check():
     # Create a new tournament, and add 2 dummy players to it.
     auth_token = sys.argv[1]
 
-    b, _ = create(auth_token, "test_tourney_pls_ignore")
+    b, _ = create(auth_token, "NEWER_test_tourney_pls_ignore")
     print(f"bracket id: {b.tourney_id}")
-    b.create_players({53190: "Alice", 3519: "Bob"})
+    players = b.create_players({53190: "Alice", 3519: "Bob"})
+    print(players)
 
-    # Make sure we resume and stuff.
-    resumed = resume(auth_token, b.tourney_id)
-    print(resumed.players)
+    # Update challonge username.
+    players_by_discord_id = {p.discord_id: p for p in players}
+    print(b.update_username(players_by_discord_id[53190], "graviddd"))
 
 
 if __name__ == '__main__':

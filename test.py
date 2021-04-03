@@ -38,29 +38,60 @@ class MyTest(unittest.TestCase):
         # No need to recreate the backup file, it will be created automatically
         # when it is opened.
 
-
 class TestAnnounceMatch(MyTest):
-    def _wait_for(self, func):
-        l = asyncio.get_event_loop()
-        l.run_until_complete(func)
 
-    def test_pings_uncalled_players_exactly_once(self):
+    def test_add_players_to_bracket(self):
+        p1_name, p2_name = "Alice", "Bob"
         p1_challonge_id, p2_challonge_id = "1001", "1002"  # Challonge IDs
         p1_discord_id, p2_discord_id = 1, 2  # Discord IDs
 
+        # Fake challonge call, will succeed
+        mock_challonge = unittest.mock.MagicMock(spec=challonge.Client)
+        mock_challonge.add_players = unittest.mock.MagicMock(return_value={
+            p1_name: p1_challonge_id,
+            p2_name: p2_challonge_id,
+        })
+
         state = tournament.State("arbitraryID12")
-        bracket = _Bracket("arbitraryToken", state)
-        players = {
-            p1_challonge_id: tournament.Player(p1_discord_id, p1_challonge_id,
-                                               1),
-            p2_challonge_id: tournament.Player(p2_discord_id, p2_challonge_id,
-                                               2),
-        }
+        bracket = _Bracket(mock_challonge, state)
+
+        # Create the players.
+        bracket.create_players({
+            p1_discord_id: p1_name,
+            p2_discord_id: p2_name,
+        })
+
+        self.assertEqual(2, len(bracket.players))
+        self.assertEqual(p1_discord_id, bracket.players[0].discord_id)
+        self.assertEqual(p1_challonge_id, bracket.players[0].challonge_id)
+        self.assertEqual(p2_discord_id, bracket.players[1].discord_id)
+        self.assertEqual(p2_challonge_id, bracket.players[1].challonge_id)
+
+    def test_pings_uncalled_players_exactly_once(self):
+        p1_name, p2_name = "Alice", "Bob"
+        p1_challonge_id, p2_challonge_id = "1001", "1002"  # Challonge IDs
+        p1_discord_id, p2_discord_id = 1, 2  # Discord IDs
+
+        # Mock response from challonge - Alice and Bob are created, yay!
+        mock_challonge = unittest.mock.MagicMock(spec=challonge.Client)
+        mock_challonge.add_players = unittest.mock.MagicMock(return_value={
+            p1_name: p1_challonge_id,
+            p2_name: p2_challonge_id,
+        })
+
+        state = tournament.State("arbitraryID12")
+        bracket = _Bracket(mock_challonge, state)
+        bracket.create_players({
+            p1_discord_id: p1_name,
+            p2_discord_id: p2_name,
+        })
         match = challonge.Match(state.tournament_id, p1_challonge_id, p2_challonge_id)
+
         context = unittest.mock.MagicMock(spec=discord.ext.commands.Context)
+        bot = _new_bot()
 
         # Ping the open match.
-        self._wait_for(main.announce_match(context, match, bracket, players))
+        _wait_for(bot._announce_match(context, match, bracket))
 
         # Players should have been pinged.
         context.send.assert_called_once()
@@ -70,7 +101,7 @@ class TestAnnounceMatch(MyTest):
         # Let's call this again. Because it's already been called once, the
         # players _should not_ be called.
         context.send.reset_mock()
-        self._wait_for(main.announce_match(context, match, bracket, players))
+        _wait_for(bot._announce_match(context, match, bracket))
 
         # No message should have been sent, since this match has been called
         # before.
@@ -79,14 +110,14 @@ class TestAnnounceMatch(MyTest):
 
 class TestReloadsState(MyTest):
     def test_resumes_main_state(self):
-        main.save_state("some_tournament_id", 1234)
+        main._save_state("some_tournament_id", 1234)
 
         # Pretend the bot crashed.
-        recovered = main.reload_state()
+        recovered = main._reload_state()
 
         self.assertEqual(1, len(recovered))
-        bracket, channel_id = recovered[0]
-        self.assertEqual("some_tournament_id", bracket.tourney_id)
+        tourney_id, channel_id = recovered[0]
+        self.assertEqual("some_tournament_id", tourney_id)
         self.assertEqual(1234, channel_id)
 
     def test_resumes_called_matches(self):
@@ -108,6 +139,16 @@ class TestReloadsState(MyTest):
 
         self.assertEqual(1, len(new_s.players))
         self.assertEqual(p, new_s.players[0])
+
+
+def _wait_for(func):
+    l = asyncio.get_event_loop()
+    l.run_until_complete(func)
+
+
+def _new_bot() -> main.Bot:
+    mock_client = unittest.mock.MagicMock(spec=discord.ext.commands.Bot)
+    return main.Bot(mock_client, "arbitrary challonge token")
 
 
 if __name__ == '__main__':

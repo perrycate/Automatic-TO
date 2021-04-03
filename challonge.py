@@ -7,6 +7,7 @@ import enum
 from dataclasses import dataclass
 from typing import Tuple, List, Dict
 
+import tournament
 import util
 
 
