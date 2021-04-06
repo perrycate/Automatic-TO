@@ -37,7 +37,7 @@ def make_request(base_url,
         # Usually we want to return any data on an HTTP error,
         # but sometimes we may wish to still treat it as an exception.
         if raise_exception_on_http_error:
-            raise error.HTTPError from e
+            raise e
         response = e
 
     # Convert raw response to usable JSON object
