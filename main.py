@@ -73,8 +73,6 @@ class Tournament(commands.Cog):
             return
         self._bracket.update_username(self._players_by_discord_id[ctx.author.id], username)
         await ctx.send("Update Successful! Log into challonge, you should have been added.")
-        # TODO tomorrow:
-        # Fix init code, then test, then fix everything else that's broken.
 
     @commands.command()
     async def begin(self, ctx, reg_msg: WrappedMessage, tourney_name="Tournament"):
