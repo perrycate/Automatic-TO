@@ -7,7 +7,6 @@ from typing import Tuple, List
 import discord
 from discord.ext import commands
 
-import bracket
 import bracket as challonge_bracket
 import challonge
 
@@ -53,22 +52,29 @@ class WrappedMessage(discord.ext.commands.MessageConverter):
             )
 
 
-class Bot(commands.Cog):
-    def __init__(self, bot: commands.Bot, challonge_token: str):
+class Tournament(commands.Cog):
+    def __init__(self, bot: commands.Bot, b: challonge_bracket.Bracket, announce_channel_id: int):
         self._bot = bot
-        self._challonge_token = challonge_token
+        self._bracket = b
+        self._players_by_discord_id = {p.discord_id: p for p in b.players}
+        self._announce_channel_id = announce_channel_id
+        self._bot.add_listener(self.on_ready, "on_ready")
 
-    @commands.Cog.listener()
     async def on_ready(self):
-        for tourney_id, announce_channel_id in _reload_state():
-            resumed_bracket = bracket.resume(self._challonge_token, tourney_id)
-            announce_channel = await self._bot.fetch_channel(announce_channel_id)
-            asyncio.create_task(self._monitor_matches(announce_channel, resumed_bracket))
+        # Monitor bracket for changes.
+        asyncio.create_task(self._monitor_matches(self._bracket))
         print('sup')
 
     @commands.command(name='set-challonge-username')
-    async def set_challonge_username(self, ctx, username: str):
-        pass  # TODO after refactor.
+    async def set_challonge_username(self, ctx: commands.Context, username: str):
+        if ctx.author.id not in self._players_by_discord_id.keys():
+            await ctx.send("Unfortunately you are not in the tournament."
+                           " Contact your TO and ask nicely, maybe they can fix it.")
+            return
+        self._bracket.update_username(self._players_by_discord_id[ctx.author.id], username)
+        await ctx.send("Update Successful! Log into challonge, you should have been added.")
+        # TODO tomorrow:
+        # Fix init code, then test, then fix everything else that's broken.
 
     @commands.command()
     async def begin(self, ctx, reg_msg: WrappedMessage, tourney_name="Tournament"):
@@ -90,18 +96,17 @@ class Bot(commands.Cog):
                 names_by_discord_id[u.id] = f'{u.name}#{u.discriminator}'
 
         # Create a challonge bracket, and match challonge IDs to discord IDs.
-        bracket, link = challonge_bracket.create(challonge_auth, tourney_name)
-        bracket.create_players(names_by_discord_id)
+        self._bracket, link = challonge_bracket.create(challonge_auth, tourney_name)
+        self._bracket.create_players(names_by_discord_id)
 
         await ctx.send(f"Bracket has been created! View it here: {link}")
 
-        _save_state(bracket.tourney_id, ctx.channel.id)
+        _save_state(self._bracket.tourney_id, ctx.channel.id)
 
-        asyncio.create_task(self._monitor_matches(ctx, bracket))
+        asyncio.create_task(self._monitor_matches(self._bracket))
 
     @staticmethod
     async def _announce_match(channel: discord.abc.Messageable, match: challonge.Match, bracket):
-        # TODO tomorrow go back to passing players in for now, see if that fixes test.
         # Finish refactor, then remove extraneous param.
         players_by_challonge_id = {p.challonge_id: p for p in bracket.players}
 
@@ -117,16 +122,16 @@ class Bot(commands.Cog):
 
         bracket.mark_called(match.id)
 
-    async def _monitor_matches(self, ctx, bracket):
+    async def _monitor_matches(self, bracket):
         """
         Poll for match updates indefinitely.
 
         If a match is "called" notify the players in discord.
         """
-
+        announce_channel = await self._bot.fetch_channel(self._announce_channel_id)
         while True:
             for match_info in bracket.fetch_open_matches():
-                await self._announce_match(ctx, match_info, bracket)
+                await self._announce_match(announce_channel, match_info, bracket)
             await asyncio.sleep(CHALLONGE_POLLING_INTERVAL_IN_SECS)
 
 
@@ -155,6 +160,18 @@ if __name__ == '__main__':
 
     # Create bot instance.
     bot = commands.Bot(command_prefix=PREFIX)
+
+    # Resume the last interrupted tournament.
+    # For now, assume we only have one tournament running at any given time.
+    # Resume the last tournament.
+    # TODO support multiple tournaments.
+    in_progress_tournaments = _reload_state()
+    tourney_id, announce_channel_id = in_progress_tournaments[-1]
+    in_progress_bracket = challonge_bracket.resume(challonge_auth, tourney_id)
+    t = Tournament(bot, in_progress_bracket, announce_channel_id)
+    bot.add_cog(t)
+
+    # Connect to discord and start doing stuff.
     bot.run(discord_auth)
 
 

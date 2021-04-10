@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """This is a thin wrapper for challonge's API."""
-
+import sys
 import uuid
 import enum
 
@@ -50,7 +50,8 @@ class Client:
         resp = util.make_request(CHALLONGE_API,
                                  '/tournaments.json',
                                  params={'api_key': self._api_key},
-                                 data=payload)
+                                 data=payload,
+                                 raise_exception_on_http_error=True)
 
         if 'tournament' not in resp:
             raise ValueError(
@@ -83,6 +84,29 @@ class Client:
             for p in resp
         }
 
+    def update_username(self, tourney_id: str, player: tournament.Player, name: str):
+        """
+        Updates a player's username in challonge.
+        Returns true iff the user was present in the tournament.
+
+        Note that the "username" is not the display name - it is the actual
+        username of the account, so they can update their own scores.
+        """
+
+        payload = {
+            'participant': {
+                'challonge_username': name,
+            }
+        }
+        util.make_request(
+            CHALLONGE_API,
+            f'/tournaments/{tourney_id}/participants/{player.challonge_id}.json',
+            params={'api_key': self._api_key},
+            data=payload,
+            raise_exception_on_http_error=True,
+            method='PUT',
+        )
+
     def list_matches(self, tourney_id: str) -> List[Match]:
 
         matches = util.make_request(CHALLONGE_API,
@@ -90,7 +114,8 @@ class Client:
                                     params={
                                         'api_key': self._api_key,
                                         'state': "open"
-                                    })
+                                    },
+                                    raise_exception_on_http_error=True)
 
         # Strip out the useless envelope-ish object
         # (an abject with 1 property, "match", and that's it.)
@@ -105,3 +130,12 @@ def _to_match(envelope):
         match_obj['player2_id'],
     )
 
+
+def _sanity_check():
+    # Create a new tournament, and add 2 dummy players to it.
+    auth_token = sys.argv[1]
+    pass
+
+
+if __name__ == '__main__':
+    _sanity_check()

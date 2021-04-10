@@ -17,16 +17,16 @@ def create(api_token, name, tournament_type=challonge.TourneyType.DOUBLE_ELIM, i
 
     tourney_id, url = challonge_client.create_tournament(name, tournament_type, is_unlisted)
 
-    return _Bracket(challonge_client, tournament.State(tourney_id)), url
+    return Bracket(challonge_client, tournament.State(tourney_id)), url
 
 
 def resume(api_token: str, tournament_id: str):
     client = challonge.Client(api_token)
-    return _Bracket(client, tournament.State(tournament_id))
+    return Bracket(client, tournament.State(tournament_id))
 
 
 # Represents a bracket in Challonge.
-class _Bracket:
+class Bracket:
     def __init__(self, client: challonge.Client, state: tournament.State):
         self._challonge_client = client
         self._local_state = state
@@ -59,6 +59,16 @@ class _Bracket:
         self._local_state.add_players(players)
         return self.players
 
+    def update_username(self, player: tournament.Player, name: str) -> bool:
+        """
+        Updates a player's username in challonge.
+        Returns true iff the user was present in the tournament.
+
+        Note that the "username" is not the display name - it is the actual
+        username of the account, so they can update their own scores.
+        """
+        return self._challonge_client.update_username(self.tourney_id, player, name)
+
     def fetch_open_matches(self):
         return self._challonge_client.list_matches(self.tourney_id)
 
@@ -73,7 +83,7 @@ def _sanity_check():
     # Create a new tournament, and add 2 dummy players to it.
     auth_token = sys.argv[1]
 
-    b, _ = create(auth_token, "NEWER_test_tourney_pls_ignore")
+    b, _ = create(auth_token, "NEWEST_test_tourney_pls_ignore")
     print(f"bracket id: {b.tourney_id}")
     players = b.create_players({53190: "Alice", 3519: "Bob"})
     print(players)

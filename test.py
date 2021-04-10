@@ -13,7 +13,7 @@ import discord
 import challonge
 import main
 import tournament
-from bracket import _Bracket
+from bracket import Bracket
 
 TEST_RUN_ID = uuid.uuid1()
 tournament.STATE_BACKUP_DIR = BACKUP_DIR = f'/tmp/{TEST_RUN_ID}'
@@ -53,7 +53,7 @@ class TestAnnounceMatch(MyTest):
         })
 
         state = tournament.State("arbitraryID12")
-        bracket = _Bracket(mock_challonge, state)
+        bracket = Bracket(mock_challonge, state)
 
         # Create the players.
         bracket.create_players({
@@ -80,7 +80,7 @@ class TestAnnounceMatch(MyTest):
         })
 
         state = tournament.State("arbitraryID12")
-        bracket = _Bracket(mock_challonge, state)
+        bracket = Bracket(mock_challonge, state)
         bracket.create_players({
             p1_discord_id: p1_name,
             p2_discord_id: p2_name,
@@ -146,9 +146,9 @@ def _wait_for(func):
     l.run_until_complete(func)
 
 
-def _new_bot() -> main.Bot:
-    mock_client = unittest.mock.MagicMock(spec=discord.ext.commands.Bot)
-    return main.Bot(mock_client, "arbitrary challonge token")
+def _new_bot() -> main.Tournament:
+    mock_client = unittest.mock.MagicMock(spec=discord.ext.commands.Tournament)
+    return main.Tournament(mock_client, "arbitrary challonge token")
 
 
 if __name__ == '__main__':
