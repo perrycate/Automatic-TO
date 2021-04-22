@@ -96,6 +96,7 @@ class Tournament(commands.Cog):
         # Create a challonge bracket, and match challonge IDs to discord IDs.
         self._bracket, link = challonge_bracket.create(challonge_auth, tourney_name)
         self._bracket.create_players(names_by_discord_id)
+        self._players_by_discord_id = {p.discord_id: p for p in self._bracket.players}
 
         await ctx.send(f"Bracket has been created! View it here: {link}")
 
