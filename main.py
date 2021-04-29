@@ -67,14 +67,6 @@ class Tournament(commands.Cog):
         asyncio.create_task(self._monitor_matches(self._bracket))
         print('sup')
 
-    @commands.command(name=PAIR_USERNAME_COMMAND)
-    async def set_challonge_username(self, ctx: commands.Context, username: str):
-        if ctx.author.id not in self._players_by_discord_id.keys():
-            await ctx.send("Unfortunately you are not in the tournament."
-                           " Contact your TO and ask nicely, maybe they can fix it.")
-            return
-        self._bracket.update_username(self._players_by_discord_id[ctx.author.id], username)
-        await ctx.send("Update Successful! Log into challonge, you should have been added.")
 
     @commands.command()
     async def begin(self, ctx, reg_msg: WrappedMessage, tourney_name="Tournament"):
@@ -100,6 +92,9 @@ class Tournament(commands.Cog):
         self._bracket.create_players(names_by_discord_id)
         self._players_by_discord_id = {p.discord_id: p for p in self._bracket.players}
 
+        _save_state(self._bracket.tourney_id, ctx.channel.id)
+        asyncio.create_task(self._monitor_matches(self._bracket))
+
         # Ping the players letting them know the bracket was created.
         message = ""
         for player_id in self._players_by_discord_id.keys():
@@ -110,9 +105,16 @@ class Tournament(commands.Cog):
 
         await ctx.send(message)
 
-        _save_state(self._bracket.tourney_id, ctx.channel.id)
 
-        asyncio.create_task(self._monitor_matches(self._bracket))
+    @commands.command(name=PAIR_USERNAME_COMMAND)
+    async def set_challonge_username(self, ctx: commands.Context, username: str):
+        if ctx.author.id not in self._players_by_discord_id.keys():
+            await ctx.send("Unfortunately you are not in the tournament."
+                           " Contact your TO and ask nicely, maybe they can fix it.")
+            return
+        self._bracket.update_username(self._players_by_discord_id[ctx.author.id], username)
+        await ctx.send("Update Successful! Log into challonge, you should have been added.")
+
 
     @staticmethod
     async def _announce_match(channel: discord.abc.Messageable, match: challonge.Match, bracket):
