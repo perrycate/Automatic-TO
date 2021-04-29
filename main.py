@@ -16,6 +16,8 @@ PREFIX = '!'
 CHALLONGE_POLLING_INTERVAL_IN_SECS = 10
 BACKUP_FILE = 'in_progress_tournaments.txt'
 
+PAIR_USERNAME_COMMAND = 'pair-challonge-account'
+
 
 def _save_state(tourney_id, channel_id):
     with open(BACKUP_FILE, 'a') as ids:
@@ -65,7 +67,7 @@ class Tournament(commands.Cog):
         asyncio.create_task(self._monitor_matches(self._bracket))
         print('sup')
 
-    @commands.command(name='set-challonge-username')
+    @commands.command(name=PAIR_USERNAME_COMMAND)
     async def set_challonge_username(self, ctx: commands.Context, username: str):
         if ctx.author.id not in self._players_by_discord_id.keys():
             await ctx.send("Unfortunately you are not in the tournament."
@@ -98,7 +100,15 @@ class Tournament(commands.Cog):
         self._bracket.create_players(names_by_discord_id)
         self._players_by_discord_id = {p.discord_id: p for p in self._bracket.players}
 
-        await ctx.send(f"Bracket has been created! View it here: {link}")
+        # Ping the players letting them know the bracket was created.
+        message = ""
+        for player_id in self._players_by_discord_id.keys():
+            message += f"<@!{player_id}> "
+        message += f"\nBracket has been created! View it here: {link}" \
+                   "\n\n If you have a challonge account, you can pair it using the command" \
+                   f"\n`{self._bot.command_prefix}{PAIR_USERNAME_COMMAND} <your challonge username>`"
+
+        await ctx.send(message)
 
         _save_state(self._bracket.tourney_id, ctx.channel.id)
 
