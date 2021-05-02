@@ -89,6 +89,10 @@ class Tournament(commands.Cog):
             tourney_name: The title of the tournament.
         """
 
+        if self._bracket is not None:
+            await ctx.send("A bracket has already been created, sorry!")
+            return
+
         # Collect all the users who reacted to the registration message.
         names_by_discord_id = {}
         for r in reg_msg.reactions:
