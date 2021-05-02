@@ -6,7 +6,7 @@ import tournament
 import challonge
 
 
-def create(api_token, name, tournament_type=challonge.TourneyType.DOUBLE_ELIM, is_unlisted=True):
+def create(api_token: str, name: str, admin_id: int, tournament_type=challonge.TourneyType.DOUBLE_ELIM, is_unlisted=True):
     """
     Creates a new tournament in Challonge owned by the user with the given API key.
 
@@ -16,8 +16,10 @@ def create(api_token, name, tournament_type=challonge.TourneyType.DOUBLE_ELIM, i
     challonge_client = challonge.Client(api_token)
 
     tourney_id, url = challonge_client.create_tournament(name, tournament_type, is_unlisted)
+    state = tournament.State(tourney_id)
+    state.set_admin(admin_id)
 
-    return Bracket(challonge_client, tournament.State(tourney_id)), url
+    return Bracket(challonge_client, state), url
 
 
 def resume(api_token: str, tournament_id: str):
@@ -48,7 +50,7 @@ class Bracket:
     # Adds the given players to the tournament bracket.
     # Returns a list of Player objects.
     # NOTE: discord names must be unique! (include the discriminator)
-    def create_players(self, names_by_discord_id):
+    def create_players(self, names_by_discord_id) -> List[tournament.Player]:
         challonge_ids_by_discord_name = self._challonge_client.add_players(self.tourney_id, names_by_discord_id.values())
 
         players = []
@@ -77,6 +79,9 @@ class Bracket:
 
     def was_called(self, mid):
         return self._local_state.was_called(mid)
+
+    def is_admin(self, player_id: int) -> bool:
+        return player_id == self._local_state.admin_id
 
 
 def _sanity_check():

@@ -26,6 +26,7 @@ class MyTest(unittest.TestCase):
     Contains setup and teardown to ensure that backup files don't mix state
     between tests.
     """
+
     def setUp(self):
         super().setUp()
 
@@ -38,6 +39,7 @@ class MyTest(unittest.TestCase):
         pathlib.Path(tournament.STATE_BACKUP_DIR).mkdir()
         # No need to recreate the backup file, it will be created automatically
         # when it is opened.
+
 
 class TestAnnounceMatch(MyTest):
 

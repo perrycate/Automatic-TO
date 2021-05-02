@@ -37,6 +37,10 @@ def _reload_state() -> List[Tuple[str, int]]:
     return tournaments_and_channels
 
 
+def _format_name(u: discord.Member) -> str:
+    return f'{u.name}#{u.discriminator}'
+
+
 class WrappedMessage(discord.ext.commands.MessageConverter):
     """
     Behaves exactly the same as discord.py's MessageConverter,
@@ -55,21 +59,25 @@ class WrappedMessage(discord.ext.commands.MessageConverter):
 
 
 class Tournament(commands.Cog):
-    def __init__(self, bot: commands.Bot, b: challonge_bracket.Bracket, announce_channel_id: int):
+    def __init__(self, bot: commands.Bot, b: challonge_bracket.Bracket = None, announce_channel_id: int = 0):
         self._bot = bot
         self._bracket = b
-        self._players_by_discord_id = {p.discord_id: p for p in b.players}
         self._announce_channel_id = announce_channel_id
-        self._bot.add_listener(self.on_ready, "on_ready")
+
+        self._players_by_discord_id = None
+        if b is not None:
+            self._players_by_discord_id = {p.discord_id: p for p in b.players}
+
+        self._bot.add_listener(self.on_ready, 'on_ready')
 
     async def on_ready(self):
         # Monitor bracket for changes.
-        asyncio.create_task(self._monitor_matches(self._bracket))
+        if self._bracket is not None:
+            asyncio.create_task(self._monitor_matches(self._bracket))
         print('sup')
 
-
     @commands.command()
-    async def begin(self, ctx, reg_msg: WrappedMessage, tourney_name="Tournament"):
+    async def create(self, ctx: commands.Context, reg_msg: WrappedMessage, tourney_name="Tournament"):
         """
         Creates a bracket containing every member that reacted to the specified reg_msg.
         Responds with a link to the new bracket.
@@ -85,14 +93,15 @@ class Tournament(commands.Cog):
         names_by_discord_id = {}
         for r in reg_msg.reactions:
             async for u in r.users():
-                names_by_discord_id[u.id] = f'{u.name}#{u.discriminator}'
+                names_by_discord_id[u.id] = _format_name(u)
 
         # Create a challonge bracket, and match challonge IDs to discord IDs.
-        self._bracket, link = challonge_bracket.create(challonge_auth, tourney_name)
+        self._announce_channel_id = ctx.channel.id
+        self._bracket, link = challonge_bracket.create(challonge_auth, tourney_name, ctx.author.id)
         self._bracket.create_players(names_by_discord_id)
         self._players_by_discord_id = {p.discord_id: p for p in self._bracket.players}
 
-        _save_state(self._bracket.tourney_id, ctx.channel.id)
+        _save_state(self._bracket.tourney_id, self._announce_channel_id)
         asyncio.create_task(self._monitor_matches(self._bracket))
 
         # Ping the players letting them know the bracket was created.
@@ -105,6 +114,15 @@ class Tournament(commands.Cog):
 
         await ctx.send(message)
 
+    @commands.command()
+    async def add_player(self, ctx: commands.Context, player: discord.Member):
+        if not self._bracket.is_admin(ctx.author.id):
+            await ctx.send("Sorry, you are not the person that created this tournament. "
+                           "Ask them _nicely_ if they can still add people.")
+            return
+        self._bracket.create_players({player.id: _format_name(player)})
+        await ctx.send("Player added successfully!")
+        # TODO next add unit tests for this.
 
     @commands.command(name=PAIR_USERNAME_COMMAND)
     async def set_challonge_username(self, ctx: commands.Context, username: str):
@@ -114,7 +132,6 @@ class Tournament(commands.Cog):
             return
         self._bracket.update_username(self._players_by_discord_id[ctx.author.id], username)
         await ctx.send("Update Successful! Log into challonge, you should have been added.")
-
 
     @staticmethod
     async def _announce_match(channel: discord.abc.Messageable, match: challonge.Match, bracket):
@@ -177,10 +194,13 @@ if __name__ == '__main__':
     # Resume the last tournament.
     # TODO support multiple tournaments.
     in_progress_tournaments = _reload_state()
-    tourney_id, announce_channel_id = in_progress_tournaments[-1]
-    in_progress_bracket = challonge_bracket.resume(challonge_auth, tourney_id)
-    t = Tournament(bot, in_progress_bracket, announce_channel_id)
-    bot.add_cog(t)
+    if len(in_progress_tournaments) > 0:
+        tourney_id, announce_channel_id = in_progress_tournaments[-1]
+        in_progress_bracket = challonge_bracket.resume(challonge_auth, tourney_id)
+        bot.add_cog(Tournament(bot, in_progress_bracket, announce_channel_id))
+    else:
+        bot.add_cog(Tournament(bot))
+
 
     # Connect to discord and start doing stuff.
     bot.run(discord_auth)
