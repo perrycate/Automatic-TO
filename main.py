@@ -114,7 +114,7 @@ class Tournament(commands.Cog):
             message += f"<@!{player_id}> "
         message += f"\nBracket has been created! View it here: {link}" \
                    "\n\n If you have a challonge account, you can pair it using the command" \
-                   f"\n`{self._bot.command_prefix}{PAIR_USERNAME_COMMAND} <your challonge username>`"
+                   f"\n`{self._bot.command_prefix}{PAIR_USERNAME_COMMAND} your-challonge-username`"
 
         await ctx.send(message)
 
