@@ -135,7 +135,7 @@ class Tournament(commands.Cog):
                            " Contact your TO and ask nicely, maybe they can fix it.")
             return
         self._bracket.update_username(self._players_by_discord_id[ctx.author.id], username)
-        await ctx.send("Update Successful! Log into challonge, you should have been added.")
+        await ctx.send("Update Successful! Log into challonge, you should have received an invitation.")
 
     @staticmethod
     async def _announce_match(channel: discord.abc.Messageable, match: challonge.Match, bracket):
