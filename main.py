@@ -106,7 +106,7 @@ class Tournament(commands.Cog):
         self._players_by_discord_id = {p.discord_id: p for p in self._bracket.players}
 
         _save_state(self._bracket.tourney_id, self._announce_channel_id)
-        asyncio.create_task(self._monitor_matches(self._bracket))
+        asyncio.create_task(self._monitor_matches())
 
         # Ping the players letting them know the bracket was created.
         message = ""
@@ -154,7 +154,7 @@ class Tournament(commands.Cog):
 
         bracket.mark_called(match.id)
 
-    async def _monitor_matches(self, bracket):
+    async def _monitor_matches(self):
         """
         Poll for match updates indefinitely.
 
@@ -162,8 +162,8 @@ class Tournament(commands.Cog):
         """
         announce_channel = await self._bot.fetch_channel(self._announce_channel_id)
         while True:
-            for match_info in bracket.fetch_open_matches():
-                await self._announce_match(announce_channel, match_info, bracket)
+            for match_info in self._bracket.fetch_open_matches():
+                await self._announce_match(announce_channel, match_info, self._bracket)
             await asyncio.sleep(CHALLONGE_POLLING_INTERVAL_IN_SECS)
 
 
