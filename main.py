@@ -146,9 +146,7 @@ class Tournament(commands.Cog):
     async def _announce_match(channel: discord.abc.Messageable, match: tournament.Match, bracket):
 
         # Don't call matches more than once.
-        print(channel)
         if bracket.was_called(match):
-            print("already called!")
             return
 
         await channel.send(
@@ -158,7 +156,6 @@ class Tournament(commands.Cog):
 
     async def check_matches(self):
         for match in self._bracket.fetch_open_matches():
-            print("found open match!")
             await self._announce_match(self._announce_channel, match, self._bracket)
 
     async def _monitor_matches(self):
