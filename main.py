@@ -59,7 +59,7 @@ class WrappedMessage(discord.ext.commands.MessageConverter):
 
 
 class Tournament(commands.Cog):
-    def __init__(self, bot: commands.Bot, b: challonge_bracket.Bracket = None, announce_channel_id: int = 0,
+    def __init__(self, bot: commands.Bot, b: challonge_bracket.Bracket = None, announce_channel_id: int = None,
                  announce_channel_override: discord.abc.Messageable = None):  # override is for testing.
         self._bot = bot
         self._bracket = b
@@ -74,13 +74,20 @@ class Tournament(commands.Cog):
 
     async def on_ready(self):
         # Fetch announce channel, unless one was injected (probably for testing.)
-        if self._announce_channel is None:
-            self._announce_channel = await self._bot.fetch_channel(self._announce_channel_id)
+        # If announce channel id isn't set, we clearly don't have a channel to
+        # announce to yet, and that's ok.
+        if self._announce_channel is None and self._announce_channel_id:
+            await self._configure_announce_channel(self._announce_channel_id)
 
         # Monitor bracket for changes.
         if self._bracket is not None:
-            asyncio.create_task(self._monitor_matches(self._bracket))
+            asyncio.create_task(self._monitor_matches())
         print('sup')
+
+    async def _configure_announce_channel(self, channel_id: int):
+        self._announce_channel_id = channel_id
+        self._announce_channel = await self._bot.fetch_channel(self._announce_channel_id)
+
 
     @commands.command()
     async def create(self, ctx: commands.Context, reg_msg: WrappedMessage, tourney_name="Tournament"):
@@ -106,7 +113,7 @@ class Tournament(commands.Cog):
                 names_by_discord_id[u.id] = _format_name(u)
 
         # Create a challonge bracket, and match challonge IDs to discord IDs.
-        self._announce_channel_id = ctx.channel.id
+        await self._configure_announce_channel(ctx.channel.id)
         self._bracket, link = challonge_bracket.create(challonge_auth, tourney_name, ctx.author.id)
         self._bracket.create_players(names_by_discord_id)
         self._players_by_discord_id = {p.discord_id: p for p in self._bracket.players}
@@ -142,21 +149,20 @@ class Tournament(commands.Cog):
         self._bracket.update_username(self._players_by_discord_id[ctx.author.id], username)
         await ctx.send("Update Successful! Log into challonge, you should have received an invitation.")
 
-    @staticmethod
-    async def _announce_match(channel: discord.abc.Messageable, match: data.Match, bracket):
+    async def _announce_match(self, match: data.Match):
 
         # Don't call matches more than once.
-        if bracket.was_called(match):
+        if self._bracket.was_called(match):
             return
 
-        await channel.send(
+        await self._announce_channel.send(
             f"<@!{match.p1.discord_id}> <@!{match.p2.discord_id}> your match has been called!")
 
-        bracket.mark_called(match)
+        self._bracket.mark_called(match)
 
     async def check_matches(self):
         for match in self._bracket.fetch_open_matches():
-            await self._announce_match(self._announce_channel, match, self._bracket)
+            await self._announce_match(match)
 
     async def _monitor_matches(self):
         """

@@ -164,11 +164,5 @@ def _wait_for(func):
     l.run_until_complete(func)
 
 
-def _new_bot() -> main.Tournament:
-    mock_challonge_client = challonge.Client('arbitrary "token"')
-    mock_bracket = bracket.Bracket(mock_challonge_client, persistent.State('arbitrary tourney ID'))
-    return main.Tournament(mock_discord_client, mock_bracket, 4206969)
-
-
 if __name__ == '__main__':
     unittest.main()
