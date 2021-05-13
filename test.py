@@ -13,12 +13,13 @@ import discord
 
 import bracket
 import challonge
+import data
 import main
-import tournament
+import persistent
 from bracket import Bracket
 
 TEST_RUN_ID = uuid.uuid1()
-tournament.STATE_BACKUP_DIR = BACKUP_DIR = f'/tmp/{TEST_RUN_ID}'
+persistent.STATE_BACKUP_DIR = BACKUP_DIR = f'/tmp/{TEST_RUN_ID}'
 main.BACKUP_FILE = BACKUP_FILE = f'/tmp/{TEST_RUN_ID}-main-file'
 
 
@@ -37,7 +38,7 @@ class MyTest(unittest.TestCase):
         if os.path.exists(BACKUP_FILE):
             os.remove(BACKUP_FILE)
 
-        pathlib.Path(tournament.STATE_BACKUP_DIR).mkdir()
+        pathlib.Path(persistent.STATE_BACKUP_DIR).mkdir()
         # No need to recreate the backup file, it will be created automatically
         # when it is opened.
 
@@ -56,7 +57,7 @@ class TestAnnounceMatch(MyTest):
             p2_name: p2_challonge_id,
         })
 
-        state = tournament.State("arbitraryID12")
+        state = persistent.State("arbitraryID12")
         bracket = Bracket(mock_challonge, state)
 
         # Create the players.
@@ -88,7 +89,7 @@ class TestAnnounceMatch(MyTest):
         mock_challonge.list_matches = unittest.mock.MagicMock(return_value=[match])
 
         # Not mocked, we're testing real logic here.
-        state = tournament.State("arbitraryID12")
+        state = persistent.State("arbitraryID12")
         bracket = Bracket(mock_challonge, state)
 
         # Mock out external dependencies.
@@ -132,27 +133,27 @@ class TestReloadsState(MyTest):
         match_id = "some-match-id"
 
         # State with 1 match called.
-        m = tournament.new_match(
-            tournament.new_player(0, "arbitrary-id1"),
-            tournament.new_player(1, "arbitrary-id2"),
+        m = data.new_match(
+            data.new_player(0, "arbitrary-id1"),
+            data.new_player(1, "arbitrary-id2"),
             match_id)
         m.call_time = datetime.now()
-        s = tournament.State(tourney_id)
+        s = persistent.State(tourney_id)
         s.set_matches([m])
 
         # pretend we crashed
 
-        new_s = tournament.State(tourney_id)  # Same tourney ID as before.
+        new_s = persistent.State(tourney_id)  # Same tourney ID as before.
         self.assertEqual(1, len(new_s.known_matches))
         self.assertIsNotNone(new_s.known_matches[0].call_time)
 
     def test_resumes_players(self):
-        s = tournament.State("arbitrary-tourney-id")
-        p = tournament.Player(123, "challonge_id", 1)
+        s = persistent.State("arbitrary-tourney-id")
+        p = data.Player(123, "challonge_id", 1)
         s.add_players([p])
 
         # pretend we crashed, this is the "reloaded" one.
-        new_s = tournament.State("arbitrary-tourney-id")
+        new_s = persistent.State("arbitrary-tourney-id")
 
         self.assertEqual(1, len(new_s.players))
         self.assertEqual(p, new_s.players[0])
@@ -165,7 +166,7 @@ def _wait_for(func):
 
 def _new_bot() -> main.Tournament:
     mock_challonge_client = challonge.Client('arbitrary "token"')
-    mock_bracket = bracket.Bracket(mock_challonge_client, tournament.State('arbitrary tourney ID'))
+    mock_bracket = bracket.Bracket(mock_challonge_client, persistent.State('arbitrary tourney ID'))
     return main.Tournament(mock_discord_client, mock_bracket, 4206969)
 
 

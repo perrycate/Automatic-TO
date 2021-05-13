@@ -7,8 +7,8 @@ from typing import Tuple, List
 import discord
 from discord.ext import commands
 
+import data
 import bracket as challonge_bracket
-import tournament  # TODO redefine match and Player in bracket.
 
 DISCORD_TOKEN_VAR = 'DISCORD_BOT_TOKEN'
 CHALLONGE_TOKEN_VAR = 'CHALLONGE_TOKEN'
@@ -143,7 +143,7 @@ class Tournament(commands.Cog):
         await ctx.send("Update Successful! Log into challonge, you should have received an invitation.")
 
     @staticmethod
-    async def _announce_match(channel: discord.abc.Messageable, match: tournament.Match, bracket):
+    async def _announce_match(channel: discord.abc.Messageable, match: data.Match, bracket):
 
         # Don't call matches more than once.
         if bracket.was_called(match):

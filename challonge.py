@@ -7,7 +7,7 @@ import enum
 from dataclasses import dataclass
 from typing import Tuple, List, Dict
 
-import tournament
+import data
 import util
 
 
@@ -84,7 +84,7 @@ class Client:
             for p in resp
         }
 
-    def update_username(self, tourney_id: str, player: tournament.Player, name: str):
+    def update_username(self, tourney_id: str, player: data.Player, name: str):
         """
         Updates a player's username in challonge.
         Returns true iff the user was present in the tournament.
