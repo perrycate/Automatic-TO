@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import sys
-from typing import List
+from datetime import datetime
+from typing import List, Dict
 
 import tournament
 import challonge
@@ -72,16 +73,48 @@ class Bracket:
         return self._challonge_client.update_username(self.tourney_id, player, name)
 
     def fetch_open_matches(self):
-        return self._challonge_client.list_matches(self.tourney_id)
+        # Fetch open matches
+        open_match_data = self._challonge_client.list_matches(self.tourney_id)
 
-    def mark_called(self, mid):
-        return self._local_state.mark_called(mid)
+        # Register any matches we don't already know about.
+        known_matches_by_id = self._known_matches_by_challonge_id()
+        players_by_challonge_id = {p.challonge_id: p for p in self._local_state.players}
+        for m in open_match_data:
+            if m.id not in known_matches_by_id:
+                p1 = players_by_challonge_id[m.p1_id]
+                p2 = players_by_challonge_id[m.p2_id]
+                known_matches_by_id[m.id] = tournament.new_match(p1, p2, m.id)
 
-    def was_called(self, mid):
-        return self._local_state.was_called(mid)
+        self._local_state.set_matches(known_matches_by_id.values())
+
+        return [known_matches_by_id[m.id] for m in open_match_data]
+
+    def mark_called(self, match: tournament.Match):
+        matches = self._known_matches_by_challonge_id()
+        mid = match.challonge_id
+        if mid not in matches:
+            raise ValueError(f"match with id '{mid}' not found in known matches")
+        matches[mid].call_time = datetime.now()
+        self._local_state.set_matches(matches.values())
+
+    def was_called(self, match: tournament.Match):
+        matches = self._known_matches_by_challonge_id()
+        mid = match.challonge_id
+        if mid not in matches:
+            # Should never happen.
+            raise ValueError(f"match with id '{mid}' not found in known matches")
+        return matches[mid].call_time is not None
 
     def is_admin(self, player_id: int) -> bool:
         return player_id == self._local_state.admin_id
+
+    def _known_matches_by_challonge_id(self) -> Dict[str, tournament.Match]:
+        """
+        Gets known matches from persistent state and indexes by challonge ID.
+        A bit wasteful not to save it once we have it, but this makes it less
+        likely that we get out of sync with our persistent state.
+        """
+        return {m.challonge_id: m for m in self._local_state.known_matches}
 
 
 def _sanity_check():

@@ -3,9 +3,16 @@ import pickle
 import uuid
 
 from dataclasses import dataclass
-from typing import List
+from typing import List, Optional, Collection
+from datetime import datetime
 
 STATE_BACKUP_DIR = 'tournament_backups/'
+
+# State uses these when writing data to a file.
+# Don't touch unless you have a good reason to.
+_ADMIN = 'admin_id'
+_MATCHES = 'called_match_ids'
+_PLAYERS = 'players'
 
 
 @dataclass
@@ -19,9 +26,29 @@ def new_player(discord_id: int, challonge_id: str) -> Player:
     return Player(discord_id, challonge_id, uuid.uuid4())
 
 
-_ADMIN = 'admin_id'
-_MATCHES = 'called_match_ids'
-_PLAYERS = 'players'
+@dataclass
+class Match:
+    p1: Player
+    p1_checked_in: bool
+
+    p2: Player
+    p2_checked_in: bool
+
+    challonge_id: str
+    call_time: Optional[datetime]
+    key_id: uuid.UUID
+
+
+def new_match(p1: Player, p2: Player, external_id: str):
+    return Match(
+        p1=p1,
+        p1_checked_in=False,
+        p2=p2,
+        p2_checked_in=False,
+        challonge_id=external_id,
+        call_time=None,
+        key_id=uuid.uuid4(),
+    )
 
 
 class State:
@@ -32,7 +59,7 @@ class State:
 
     def __init__(self, tournament_id: str):
         self._tournament_id = tournament_id
-        self._called_matches = set()
+        self._known_matches = []
         self._players = []
         self._admin_id = None
         # NOTE: Anytime you add a relevant piece of tournament state, you must
@@ -57,7 +84,7 @@ class State:
 
     def _load_from(self, file):
         state = pickle.load(file)
-        self._called_matches = state[_MATCHES]
+        self._known_matches = state[_MATCHES]
         self._players = state[_PLAYERS]
         self._admin_id = state[_ADMIN]
 
@@ -69,23 +96,27 @@ class State:
         with open(self._save_file_name, 'wb') as save_file:
             pickle.dump(
                 {
-                    _MATCHES: self._called_matches,
+                    _MATCHES: self._known_matches,
                     _PLAYERS: self._players,
                     _ADMIN: self._admin_id,
                 }, save_file)
             save_file.flush()
 
     @property
-    def tournament_id(self):
+    def tournament_id(self) -> str:
         return self._tournament_id
 
     @property
-    def players(self):
+    def players(self) -> List[Player]:
         return self._players
 
     @property
-    def admin_id(self):
+    def admin_id(self) -> int:
         return self._admin_id
+
+    @property
+    def known_matches(self) -> List[Match]:
+        return self._known_matches
 
     def add_players(self, players: List[Player]):
         # We can only ever add players, because we just store the player data here.
@@ -98,9 +129,6 @@ class State:
         self._admin_id = admin_id
         self._save()
 
-    def mark_called(self, match_id):
-        self._called_matches.add(match_id)
+    def set_matches(self, matches: Collection[Match]):
+        self._known_matches = list(matches)
         self._save()
-
-    def was_called(self, match_id):
-        return match_id in self._called_matches
