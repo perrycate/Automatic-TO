@@ -149,20 +149,14 @@ class Tournament(commands.Cog):
         self._bracket.update_username(self._players_by_discord_id[ctx.author.id], username)
         await ctx.send("Update Successful! Log into challonge, you should have received an invitation.")
 
-    async def _announce_match(self, match: data.Match):
-
-        # Don't call matches more than once.
-        if self._bracket.was_called(match):
-            return
-
-        await self._announce_channel.send(
-            f"<@!{match.p1.discord_id}> <@!{match.p2.discord_id}> your match has been called!")
-
-        self._bracket.mark_called(match)
-
     async def check_matches(self):
         for match in self._bracket.fetch_open_matches():
-            await self._announce_match(match)
+            # Don't call matches if it's already been called before.
+            if not self._bracket.was_called(match):
+                await self._announce_channel.send(
+                    f"<@!{match.p1.discord_id}> <@!{match.p2.discord_id}> your match has been called!")
+
+                self._bracket.mark_called(match)
 
     async def _monitor_matches(self):
         """
