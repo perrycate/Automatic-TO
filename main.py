@@ -2,19 +2,25 @@
 import asyncio
 import os
 import sys
-from typing import Tuple, List
+from dataclasses import dataclass
+from datetime import datetime, timedelta
+from typing import Tuple, List, Set
 
 import discord
 from discord.ext import commands
 
-import data
 import bracket as challonge_bracket
+import util
 
 DISCORD_TOKEN_VAR = 'DISCORD_BOT_TOKEN'
 CHALLONGE_TOKEN_VAR = 'CHALLONGE_TOKEN'
+
 PREFIX = '!'
 CHALLONGE_POLLING_INTERVAL_IN_SECS = 10
 BACKUP_FILE = 'in_progress_tournaments.txt'
+DEFAULT_WARN_TIMER_IN_MINS = 5
+DEFAULT_DQ_TIMER_IN_MINS = 10
+DEFAULT_CHECK_IN_EMOJI = discord.PartialEmoji(name="👍")
 
 PAIR_USERNAME_COMMAND = 'pair-challonge-account'
 
@@ -41,6 +47,24 @@ def _format_name(u: discord.Member) -> str:
     return f'{u.name}#{u.discriminator}'
 
 
+def _minutes_in(td: timedelta) -> float:
+    return td.seconds / 60
+
+
+def _get_emoji_id(emoji: discord.PartialEmoji) -> str:
+    """
+    Returns a useable string ID for the given emoji object.
+
+    This is necessary because discord emojis have different semantics if
+    they are a built-in emoji vs a custom one. Custom ones have an ID, but
+    the name can be easily changed and is thus unreliable. Standard emojis
+    have a name that is stable (in theory), but their ID is None.
+    """
+    if emoji.id is None:
+        return emoji.name
+    return emoji.id
+
+
 class WrappedMessage(discord.ext.commands.MessageConverter):
     """
     Behaves exactly the same as discord.py's MessageConverter,
@@ -58,13 +82,25 @@ class WrappedMessage(discord.ext.commands.MessageConverter):
             )
 
 
+@dataclass
+class Options:
+    # How many minutes after a match is called to wait before warning/DQing a player for no-showing.
+    warn_timer_in_minutes: float = DEFAULT_WARN_TIMER_IN_MINS
+    dq_timer_in_minutes: float = DEFAULT_DQ_TIMER_IN_MINS
+    check_in_emoji: discord.PartialEmoji = DEFAULT_CHECK_IN_EMOJI
+
+
 class Tournament(commands.Cog):
     def __init__(self, bot: commands.Bot, b: challonge_bracket.Bracket = None, announce_channel_id: int = None,
-                 announce_channel_override: discord.abc.Messageable = None):  # override is for testing.
+                 announce_channel_override: discord.abc.Messageable = None,
+                 options: Options = Options()):  # override is for testing.
         self._bot = bot
         self._bracket = b
         self._announce_channel_id = announce_channel_id
         self._announce_channel = announce_channel_override
+        self._check_in_emoji = options.check_in_emoji
+        self._warn_time_in_mins = options.warn_timer_in_minutes
+        self._dq_time_in_mins = options.dq_timer_in_minutes
 
         self._players_by_discord_id = None
         if b is not None:
@@ -87,7 +123,6 @@ class Tournament(commands.Cog):
     async def _configure_announce_channel(self, channel_id: int):
         self._announce_channel_id = channel_id
         self._announce_channel = await self._bot.fetch_channel(self._announce_channel_id)
-
 
     @commands.command()
     async def create(self, ctx: commands.Context, reg_msg: WrappedMessage, tourney_name="Tournament"):
@@ -151,12 +186,73 @@ class Tournament(commands.Cog):
 
     async def check_matches(self):
         for match in self._bracket.fetch_open_matches():
-            # Don't call matches if it's already been called before.
-            if not self._bracket.was_called(match):
-                await self._announce_channel.send(
-                    f"<@!{match.p1.discord_id}> <@!{match.p2.discord_id}> your match has been called!")
+            # Call any matches that haven't been called yet.
+            if match.call_time is None:
+                # Tell players before updating state - in the event of a crash,
+                # better they get pinged twice than someone gets DQ'd without being told about it.
+                call_message = await self._announce_channel.send(
+                    f"<@!{match.p1.discord_id}> <@!{match.p2.discord_id}> your match has been called!"
+                    f" React with {self._check_in_emoji} in the next {self._dq_time_in_mins} minutes to check in!")
 
-                self._bracket.mark_called(match)
+                match.call_message_id = call_message.id
+                match.call_time = datetime.now()
+                self._bracket.save_metadata(match)
+                continue
+
+            # Warn players that haven't checked in.
+            if _minutes_in(datetime.now() - match.call_time) >= self._warn_time_in_mins and match.warn_time is None:
+
+                checked_in_ids = await self._get_checkins(match.call_message_id)
+
+                # Ping players that didn't check-in to this match.
+                if match.p1.discord_id not in checked_in_ids:
+                    await self._announce_channel.send(self._warn_msg(match.p1.discord_id))
+                if match.p2.discord_id not in checked_in_ids:
+                    await self._announce_channel.send(self._warn_msg(match.p2.discord_id))
+
+                # Mark this match as warned, so we don't ping them again.
+                match.warn_time = datetime.now()
+                self._bracket.save_metadata(match)
+                continue
+
+            # DQ players if they took too long to check in.
+            if _minutes_in((datetime.now() - match.call_time)) > self._dq_time_in_mins and match.dq_time is None:
+                # Make sure that if something fails (for example, interacting
+                # with challonge), we don't ping players multiple times.
+                match.dq_time = datetime.now()
+                self._bracket.save_metadata(match)
+
+                checked_in_ids = await self._get_checkins(match.call_message_id)
+                p1_checked_in = match.p1.discord_id in checked_in_ids
+                p2_checked_in = match.p2.discord_id in checked_in_ids
+
+                if p1_checked_in:
+                    if not p2_checked_in:
+                        # Only P2 gets DQ'd
+                        self._bracket.save_score(match, 0, -1)
+                        await self._announce_channel.send(self._dq_msg(match.p2.discord_id))
+                else:
+                    if p2_checked_in:
+                        # Only P1 gets DQ'd
+                        self._bracket.save_score(match, -1, 0)
+                        await self._announce_channel.send(self._dq_msg(match.p1.discord_id))
+                    else:
+                        # If neither player checks in, only P2 gets DQ'd
+                        # TODO tomorrow: save score isn't working.
+                        # Also let's not ping them every 10 seconds if challonge has an issue.
+                        self._bracket.save_score(match, -1, -2)
+                        await self._announce_channel.send(f"Wow, neither player checked in. Unfortunately I can only DQ"
+                                                          f" one of you, so I'm DQing <@!{match.p2.discord_id}>."
+                                                          f" <@!{match.p1.discord_id}>, I'm watching you...")
+
+    async def _get_checkins(self, mid: int) -> Set[int]:
+        message = await self._announce_channel.fetch_message(mid)
+        for r in message.reactions:
+            # Assuming r.emoji is a built-in emoji.
+            # TODO support custom emojis as well as built-in emojis.
+            if r.emoji == self._check_in_emoji.name:
+                return await util.get_user_ids(r)
+        return set()
 
     async def _monitor_matches(self):
         """
@@ -167,6 +263,15 @@ class Tournament(commands.Cog):
         while True:
             await self.check_matches()
             await asyncio.sleep(CHALLONGE_POLLING_INTERVAL_IN_SECS)
+
+    def _warn_msg(self, player_challonge_id: str) -> str:
+        return f"<@!{player_challonge_id}> it has been at least {self._warn_time_in_mins} minutes since your match " \
+               f"was called. Please check in in the next {self._dq_time_in_mins - self._warn_time_in_mins} minutes or " \
+               f"be disqualified."
+
+    def _dq_msg(self, player_challonge_id: str) -> str:
+        return f"<@!{player_challonge_id}> it has been at least {self._dq_time_in_mins} minutes since your match " \
+               f"was called. You have been disqualified from that match."
 
 
 if __name__ == '__main__':
@@ -206,7 +311,6 @@ if __name__ == '__main__':
         bot.add_cog(Tournament(bot, in_progress_bracket, announce_channel_id))
     else:
         bot.add_cog(Tournament(bot))
-
 
     # Connect to discord and start doing stuff.
     bot.run(discord_auth)

@@ -1,15 +1,13 @@
 #!/usr/bin/env python3
 """This is a thin wrapper for challonge's API."""
+import enum
 import sys
 import uuid
-import enum
-
 from dataclasses import dataclass
 from typing import Tuple, List, Dict
 
 import data
 import util
-
 
 CHALLONGE_API = 'https://api.challonge.com/v1'
 
@@ -51,7 +49,7 @@ class Client:
                                  '/tournaments.json',
                                  params={'api_key': self._api_key},
                                  data=payload,
-                                 raise_exception_on_http_error=True)
+                                 raise_exception_on_http_error=False)
 
         if 'tournament' not in resp:
             raise ValueError(
@@ -68,8 +66,6 @@ class Client:
         payload = {
             'participants': [{"name": n} for n in names],
         }
-        print(payload)
-        print(tourney_id)
         resp = util.make_request(
             CHALLONGE_API,
             f'/tournaments/{tourney_id}/participants/bulk_add.json',
@@ -108,7 +104,6 @@ class Client:
         )
 
     def list_matches(self, tourney_id: str) -> List[Match]:
-
         matches = util.make_request(CHALLONGE_API,
                                     f'/tournaments/{tourney_id}/matches.json',
                                     params={
@@ -120,6 +115,19 @@ class Client:
         # Strip out the useless envelope-ish object
         # (an abject with 1 property, "match", and that's it.)
         return [_to_match(m) for m in matches]
+
+    def set_score(self, tourney_id: str, match_id: str, p1_score: int, p2_score: int, winner_id: str):
+        util.make_request(CHALLONGE_API,
+                          f'/tournaments/{tourney_id}/matches/{match_id}.json',
+                          params={'api_key': self._api_key},
+                          data={
+                              'match': {
+                                  'scores_csv': f'{p1_score}-{p2_score}',
+                                  'winner_id': winner_id,
+                              }
+                          },
+                          method='PUT',
+                          raise_exception_on_http_error=True)
 
 
 def _to_match(envelope):
@@ -134,7 +142,16 @@ def _to_match(envelope):
 def _sanity_check():
     # Create a new tournament, and add 2 dummy players to it.
     auth_token = sys.argv[1]
-    pass
+
+    c = Client(api_key=auth_token)
+    tid, url = c.create_tournament("test_tourney_please_ignore")
+    print(url)
+    c.add_players(tid, ["Eve", "Mallory"])
+    # Start tourney, then press enter in terminal.
+    input()
+    match = c.list_matches(tid)[0]
+
+    c.set_score(tid, match.id, 69, 420, match.p2_id)
 
 
 if __name__ == '__main__':

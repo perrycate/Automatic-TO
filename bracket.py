@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import sys
-from datetime import datetime
 from typing import List, Dict
 
 import challonge
@@ -8,7 +7,8 @@ import data
 import persistent
 
 
-def create(api_token: str, name: str, admin_id: int, tournament_type=challonge.TourneyType.DOUBLE_ELIM, is_unlisted=True):
+def create(api_token: str, name: str, admin_id: int, tournament_type=challonge.TourneyType.DOUBLE_ELIM,
+           is_unlisted=True):
     """
     Creates a new tournament in Challonge owned by the user with the given API key.
 
@@ -53,7 +53,8 @@ class Bracket:
     # Returns a list of Player objects.
     # NOTE: discord names must be unique! (include the discriminator)
     def create_players(self, names_by_discord_id) -> List[data.Player]:
-        challonge_ids_by_discord_name = self._challonge_client.add_players(self.tourney_id, names_by_discord_id.values())
+        challonge_ids_by_discord_name = self._challonge_client.add_players(self.tourney_id,
+                                                                           names_by_discord_id.values())
 
         players = []
         for discord_id, name in names_by_discord_id.items():
@@ -90,21 +91,15 @@ class Bracket:
 
         return [known_matches_by_id[m.id] for m in open_match_data]
 
-    def mark_called(self, match: data.Match):
+    def save_metadata(self, match: data.Match):
+        # Wasteful, but fine.
         matches = self._known_matches_by_challonge_id()
-        mid = match.challonge_id
-        if mid not in matches:
-            raise ValueError(f"match with id '{mid}' not found in known matches")
-        matches[mid].call_time = datetime.now()
+        matches[match.challonge_id] = match
         self._local_state.set_matches(matches.values())
 
-    def was_called(self, match: data.Match):
-        matches = self._known_matches_by_challonge_id()
-        mid = match.challonge_id
-        if mid not in matches:
-            # Should never happen.
-            raise ValueError(f"match with id '{mid}' not found in known matches")
-        return matches[mid].call_time is not None
+    def save_score(self, match: data.Match, p1_score: int, p2_score: int):
+        winner_id = match.p1.challonge_id if p1_score >= p2_score else match.p2.challonge_id
+        self._challonge_client.set_score(self.tourney_id, match.challonge_id, p1_score, p2_score, winner_id)
 
     def is_admin(self, player_id: int) -> bool:
         return player_id == self._local_state.admin_id

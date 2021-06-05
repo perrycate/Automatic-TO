@@ -1,5 +1,21 @@
 import json
-from urllib import error, parse, request
+from typing import Set
+from urllib import error, request
+
+import discord
+
+
+async def get_user_ids(r: discord.Reaction) -> Set[int]:
+    """
+    Extracts user ids from a discord reaction.
+
+    This only exists because testing anything involving discord reactions
+    is a pain, and we want to mock it out.
+    """
+    pids = set()
+    async for u in r.users():
+        pids.add(u.id)
+    return pids
 
 
 def make_request(base_url,
