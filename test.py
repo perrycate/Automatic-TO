@@ -421,6 +421,7 @@ class TestReloadsState(MyTest):
 
     def test_resumes_called_matches(self):
         tourney_id = "some-tourney-id"
+        tourney_link = "challonge.com/arbitrary-link"
         match_id = "some-match-id"
 
         # State with 1 match called.
@@ -429,7 +430,7 @@ class TestReloadsState(MyTest):
             data.new_player(1, "arbitrary-id2"),
             match_id)
         m.call_time = datetime.now()
-        s = persistent.State(tourney_id)
+        s = persistent.State(tourney_id, tourney_link)
         s.set_matches([m])
 
         # pretend we crashed
@@ -437,6 +438,7 @@ class TestReloadsState(MyTest):
         new_s = persistent.State(tourney_id)  # Same tourney ID as before.
         self.assertEqual(1, len(new_s.known_matches))
         self.assertIsNotNone(new_s.known_matches[0].call_time)
+        self.assertEqual(tourney_link, new_s.bracket_link)
 
     def test_resumes_players(self):
         s = persistent.State("arbitrary-tourney-id")

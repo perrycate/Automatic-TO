@@ -22,8 +22,10 @@ DEFAULT_WARN_TIMER_IN_MINS = 5
 DEFAULT_DQ_TIMER_IN_MINS = 10
 DEFAULT_CHECK_IN_EMOJI = discord.PartialEmoji(name="👍")
 
+CREATE_COMMAND = 'create'
 PAIR_USERNAME_COMMAND = 'pair-challonge-account'
 ADD_PLAYER_COMMAND = 'add-player'
+GET_BRACKET_COMMAND = 'bracket'
 
 
 def _save_state(tourney_id, channel_id):
@@ -125,7 +127,7 @@ class Tournament(commands.Cog):
         self._announce_channel_id = channel_id
         self._announce_channel = await self._bot.fetch_channel(self._announce_channel_id)
 
-    @commands.command()
+    @commands.command(name=CREATE_COMMAND)
     async def create(self, ctx: commands.Context, reg_msg: WrappedMessage, tourney_name="Tournament"):
         """
         Creates a bracket with every member that reacted to the specified message.
@@ -154,7 +156,7 @@ class Tournament(commands.Cog):
 
         # Create a challonge bracket, and match challonge IDs to discord IDs.
         await self._configure_announce_channel(ctx.channel.id)
-        self._bracket, link = challonge_bracket.create(challonge_auth, tourney_name, ctx.author.id)
+        self._bracket = challonge_bracket.create(challonge_auth, tourney_name, ctx.author.id)
         self._bracket.create_players(names_by_discord_id)
         self._players_by_discord_id = {p.discord_id: p for p in self._bracket.players}
 
@@ -165,7 +167,7 @@ class Tournament(commands.Cog):
         message = ""
         for player_id in self._players_by_discord_id.keys():
             message += f"<@!{player_id}> "
-        message += f"\nBracket has been created! View it here: {link}" \
+        message += f"\nBracket has been created! View it here: {self._bracket.link}" \
                    "\n\n If you have a challonge account, you can pair it using the command" \
                    f"\n`{self._bot.command_prefix}{PAIR_USERNAME_COMMAND} your-challonge-username`"
 
@@ -203,6 +205,23 @@ class Tournament(commands.Cog):
             return
         self._bracket.update_username(self._players_by_discord_id[ctx.author.id], username)
         await ctx.send("Update Successful! Log into challonge, you should have received an invitation.")
+
+    @commands.command(name=GET_BRACKET_COMMAND)
+    async def get_bracket_link(self, ctx):
+        """Returns a link to the current tournament."""
+        if self._bracket is None:
+            await ctx.send(f"Sorry, no bracket exists yet. Ask your TO to run the {CREATE_COMMAND} command!")
+        else:
+            await ctx.send(self._bracket.link)
+
+    @commands.command(name='link')
+    async def get_bracket_link_alt_def(self, ctx):
+        """
+        Returns a link to the current tournament.
+
+        This exists because the devs couldn't figure out whether !link or !bracket was better.
+        """
+        await self.get_bracket_link(ctx)
 
     async def check_matches(self):
         for match in self._bracket.fetch_open_matches():

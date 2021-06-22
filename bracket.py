@@ -18,10 +18,10 @@ def create(api_token: str, name: str, admin_id: int, tournament_type=challonge.T
     challonge_client = challonge.Client(api_token)
 
     tourney_id, url = challonge_client.create_tournament(name, tournament_type, is_unlisted)
-    state = persistent.State(tourney_id)
+    state = persistent.State(tourney_id, url)
     state.set_admin(admin_id)
 
-    return Bracket(challonge_client, state), url
+    return Bracket(challonge_client, state)
 
 
 def resume(api_token: str, tournament_id: str):
@@ -36,8 +36,12 @@ class Bracket:
         self._local_state = state
 
     @property
-    def tourney_id(self):
+    def tourney_id(self) -> str:
         return self._local_state.tournament_id
+
+    @property
+    def link(self) -> str:
+        return self._local_state.bracket_link
 
     @property
     def players(self) -> List[data.Player]:
@@ -117,7 +121,7 @@ def _sanity_check():
     # Create a new tournament, and add 2 dummy players to it.
     auth_token = sys.argv[1]
 
-    b, _ = create(auth_token, "NEWEST_test_tourney_pls_ignore")
+    b = create(auth_token, "NEWEST_test_tourney_pls_ignore")
     print(f"bracket id: {b.tourney_id}")
     players = b.create_players({53190: "Alice", 3519: "Bob"})
     print(players)

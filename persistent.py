@@ -12,6 +12,7 @@ STATE_BACKUP_DIR = 'tournament_backups/'
 _ADMIN = 'admin_id'
 _MATCHES = 'called_match_ids'
 _PLAYERS = 'players'
+_LINK = 'tournament_link'
 
 
 class State:
@@ -20,11 +21,12 @@ class State:
     This class backs info up in a nonvolatile way.
     """
 
-    def __init__(self, tournament_id: str):
+    def __init__(self, tournament_id, link: str = 'unspecified, sorry. :/'):
         self._tournament_id = tournament_id
         self._known_matches = []
         self._players = []
         self._admin_id = None
+        self._tournament_link = link
         # NOTE: Anytime you add a relevant piece of tournament state, you must
         # add it to _load_from and _save as well.
         # WARNING: Do not add state in the constructor. Make separate set_<thingy> methods.
@@ -50,6 +52,7 @@ class State:
         self._known_matches = state[_MATCHES]
         self._players = state[_PLAYERS]
         self._admin_id = state[_ADMIN]
+        self._tournament_link = state[_LINK]
 
     def _save(self):
         # If we crash before writing to the file we might lose state, but
@@ -62,6 +65,7 @@ class State:
                     _MATCHES: self._known_matches,
                     _PLAYERS: self._players,
                     _ADMIN: self._admin_id,
+                    _LINK: self._tournament_link
                 }, save_file)
             save_file.flush()
 
@@ -80,6 +84,10 @@ class State:
     @property
     def known_matches(self) -> List[data.Match]:
         return self._known_matches
+
+    @property
+    def bracket_link(self) -> str:
+        return self._tournament_link
 
     def add_players(self, players: List[data.Player]):
         # We can only ever add players, because we just store the player data here.
