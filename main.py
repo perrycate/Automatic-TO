@@ -23,6 +23,7 @@ DEFAULT_DQ_TIMER_IN_MINS = 10
 DEFAULT_CHECK_IN_EMOJI = discord.PartialEmoji(name="👍")
 
 PAIR_USERNAME_COMMAND = 'pair-challonge-account'
+ADD_PLAYER_COMMAND = 'add-player'
 
 
 def _save_state(tourney_id, channel_id):
@@ -127,8 +128,12 @@ class Tournament(commands.Cog):
     @commands.command()
     async def create(self, ctx: commands.Context, reg_msg: WrappedMessage, tourney_name="Tournament"):
         """
-        Creates a bracket containing every member that reacted to the specified reg_msg.
+        Creates a bracket with every member that reacted to the specified message.
         Responds with a link to the new bracket.
+
+        Anyone can run this command if there isn't a tournament already in progress, so choose permissions wisely.
+        The admin of the challonge bracket is the one specified when the bot is turned up.
+        If you don't know what that means, it isn't you.
 
         Args:
             reg_msg: The message to check for reactions.
@@ -166,8 +171,16 @@ class Tournament(commands.Cog):
 
         await ctx.send(message)
 
-    @commands.command()
+    @commands.command(name=ADD_PLAYER_COMMAND)
     async def add_player(self, ctx: commands.Context, player: discord.Member):
+        """
+        Adds the given player to the ongoing tournament.
+
+        Only the person who created the bracket can run this command.
+
+        args:
+            player: The player to add.
+        """
         if not self._bracket.is_admin(ctx.author.id):
             await ctx.send("Sorry, you are not the person that created this tournament. "
                            "Ask them _nicely_ if they can still add people.")
@@ -177,6 +190,13 @@ class Tournament(commands.Cog):
 
     @commands.command(name=PAIR_USERNAME_COMMAND)
     async def set_challonge_username(self, ctx: commands.Context, username: str):
+        """
+        Pairs yourself with the given challonge username.
+
+        This allows the specified challonge user to report scores for the player that ran this.
+        After running this command, that user should get a notification in challonge to accept being added.
+        Any player can run this command, as it only affects the caller.
+        """
         if ctx.author.id not in self._players_by_discord_id.keys():
             await ctx.send("Unfortunately you are not in the tournament."
                            " Contact your TO and ask nicely, maybe they can fix it.")
