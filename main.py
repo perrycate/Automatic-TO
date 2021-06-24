@@ -236,6 +236,10 @@ class Tournament(commands.Cog):
                 match.call_message_id = call_message.id
                 match.call_time = datetime.now()
                 self._bracket.save_metadata(match)
+
+                # Pre-react to the message with the check-in emoji to make it easier for the players.
+                # We do this after updating the metadata in case it fails for some reason.
+                await call_message.add_reaction(self._check_in_emoji)
                 continue
 
             # Warn players that haven't checked in.
