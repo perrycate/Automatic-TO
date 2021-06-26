@@ -78,7 +78,7 @@ class Bracket:
         """
         return self._challonge_client.update_username(self.tourney_id, player, name)
 
-    def fetch_open_matches(self):
+    def fetch_open_matches(self) -> List[data.Match]:
         # Fetch open matches
         open_match_data = self._challonge_client.list_matches(self.tourney_id)
 
