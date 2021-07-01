@@ -76,7 +76,7 @@ class Client:
         # Response format is a list of dicts, all with one property "participant".
         # Convert into dict of players by name.
         return {
-            p["participant"]["name"]: p["participant"]["id"]
+            p['participant']['name']: p['participant']['id']
             for p in resp
         }
 
@@ -116,6 +116,28 @@ class Client:
         # (an abject with 1 property, "match", and that's it.)
         return [_to_match(m) for m in matches]
 
+    def list_player_names_by_id(self, tourney_id: str) -> Dict[str, str]:
+        """
+        Returns a map of player IDs to player names in challonge.
+
+        Uses the official challonge username for a player if it is set.
+        If the challonge username is not set, returns the nickname used by that player in the bracket.
+        """
+        player_objs = util.make_request(CHALLONGE_API,
+                                    f'/tournaments/{tourney_id}/participants.json',
+                                    {'api_key': self._api_key},
+                                    raise_exception_on_http_error=True)
+
+        names_by_id = {}
+        for p in player_objs:
+            # Each player object has only one key, 'participant',
+            # mapped to another object that actually has the info we want.
+            p = p['participant']
+            name = p['challonge_username'] if p['challonge_username'] else p['name']
+            names_by_id[p['id']] = name
+
+        return names_by_id
+
     def set_score(self, tourney_id: str, match_id: str, p1_score: int, p2_score: int, winner_id: str):
         util.make_request(CHALLONGE_API,
                           f'/tournaments/{tourney_id}/matches/{match_id}.json',
@@ -131,7 +153,7 @@ class Client:
 
 
 def _to_match(envelope):
-    match_obj = envelope["match"]
+    match_obj = envelope['match']
     return Match(
         match_obj['id'],
         match_obj['player1_id'],
@@ -139,19 +161,25 @@ def _to_match(envelope):
     )
 
 
-def _sanity_check():
+def _test_creation():
     # Create a new tournament, and add 2 dummy players to it.
     auth_token = sys.argv[1]
 
     c = Client(api_key=auth_token)
     tid, url = c.create_tournament("test_tourney_please_ignore")
+    print(tid)
     print(url)
-    c.add_players(tid, ["Eve", "Mallory"])
-    # Start tourney, then press enter in terminal.
-    input()
-    match = c.list_matches(tid)[0]
 
-    c.set_score(tid, match.id, 69, 420, match.p2_id)
+    c.add_players(tid, ["Eve", "Mallory"])
+    print(c.list_player_names_by_id(tid))
+
+
+def _sanity_check():
+    auth_token = sys.argv[1]
+    tid = sys.argv[2]
+
+    c = Client(api_key=auth_token)
+    print(c.list_player_names_by_id(tid))
 
 
 if __name__ == '__main__':
