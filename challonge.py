@@ -104,6 +104,7 @@ class Client:
         )
 
     def list_matches(self, tourney_id: str) -> List[Match]:
+        """Returns a list of in-progress matches."""
         matches = util.make_request(CHALLONGE_API,
                                     f'/tournaments/{tourney_id}/matches.json',
                                     params={
