@@ -21,6 +21,7 @@ async def get_user_ids(r: discord.Reaction) -> Set[int]:
 def make_request(base_url,
                  additional_url,
                  params={},
+                 headers={},
                  data=None,
                  raise_exception_on_http_error=False,
                  method=None):
@@ -42,12 +43,12 @@ def make_request(base_url,
 
         url += f'&{param}={value}'
 
-    headers = {}
+    query_headers = headers.copy()
     if data is not None:
         data = json.dumps(data).encode()
-        headers['Content-Type'] = 'application/json'
+        query_headers['Content-Type'] = 'application/json'
     try:
-        r = request.Request(url, data, headers, method=method)
+        r = request.Request(url, data, query_headers, method=method)
         response = request.urlopen(r)
     except error.HTTPError as e:
         # Usually we want to return any data on an HTTP error,
